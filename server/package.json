@@ -1,0 +1,19 @@
+{
+  "name": "tatamecheck-server",
+  "version": "1.0.0",
+  "description": "Backend para TatameCheck - Gestão de Academias de Jiu-Jitsu",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.0.0"
+  }
+}
+
