@@ -135,14 +135,10 @@ const Dashboard = () => {
                 <div className="app-header-left">
                 </div>
                 <div className="app-header-center">
-                    <p className="app-eyebrow">TatameCheck</p>
                     <div className="app-title">
                         <span>{allModules.find(m => m.id === activeModule)?.icon}</span>
-                        <span>{allModules.find(m => m.id === activeModule)?.name}</span>
+                        <span>{allModules.find(m => m.id === activeModule)?.name || 'TatameCheck'}</span>
                     </div>
-                    <p className="app-progress">
-                        {user?.name || user?.email}
-                    </p>
                 </div>
                 <div className="app-header-right">
                     {extraModules.length > 0 && (
