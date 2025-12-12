@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "axios": "^1.13.2",
-    "leaflet": "^1.9.4",
+    "maplibre-gl": "^4.7.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-leaflet": "^4.2.1",
+    "react-map-gl": "^7.1.9",
     "react-router-dom": "^7.9.6"
   },
   "devDependencies": {
@@ -29,4 +29,3 @@
     "vite": "^7.2.4"
   }
 }
-

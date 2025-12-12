@@ -9,6 +9,12 @@ export default defineConfig({
       // Proxy para a API do backend (porta 5000)
       '/api': 'http://localhost:5000'
     }
+  },
+  resolve: {
+    alias: {
+      // Substituir mapbox-gl por maplibre-gl para usar MapLibre gratuito
+      'mapbox-gl': 'maplibre-gl'
+    }
   }
 })
 

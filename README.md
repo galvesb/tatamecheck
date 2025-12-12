@@ -29,10 +29,10 @@ O TatameCheck otimiza as três áreas mais críticas da operação diária:
 ### Frontend
 ```bash
 cd tatamecheck
-npm install --legacy-peer-deps
+npm install
 ```
 
-**Nota:** Usamos `--legacy-peer-deps` porque `react-leaflet` ainda não suporta oficialmente React 19, mas funciona perfeitamente. O arquivo `.npmrc` já está configurado para usar isso automaticamente.
+**Nota:** O projeto usa **MapLibre GL JS** (gratuito e open source) para mapas interativos, que é compatível com React 19.
 
 ### Backend
 ```bash

@@ -1,9 +1,57 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import Map, { Marker, Popup, Source, Layer } from 'react-map-gl/maplibre';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import '../index.css';
 
-// Variável global para armazenar a biblioteca Leaflet carregada
-let L = null;
+// Função auxiliar para calcular distância (Haversine)
+const calcularDistancia = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000; // Raio da Terra em metros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+};
+
+// Função para criar um GeoJSON de círculo (usando fórmula precisa)
+const criarCirculoGeoJSON = (center, radiusInMeters) => {
+    const points = 64; // Número de pontos para formar o círculo
+    const coords = [];
+    const R = 6371000; // Raio da Terra em metros
+    
+    for (let i = 0; i <= points; i++) {
+        const angle = (i * 360) / points;
+        const angleRad = angle * Math.PI / 180;
+        
+        // Fórmula precisa para calcular ponto em um círculo
+        const lat1Rad = center.lat * Math.PI / 180;
+        const lon1Rad = center.lng * Math.PI / 180;
+        const d = radiusInMeters / R;
+        
+        const lat2Rad = Math.asin(
+            Math.sin(lat1Rad) * Math.cos(d) +
+            Math.cos(lat1Rad) * Math.sin(d) * Math.cos(angleRad)
+        );
+        
+        const lon2Rad = lon1Rad + Math.atan2(
+            Math.sin(angleRad) * Math.sin(d) * Math.cos(lat1Rad),
+            Math.cos(d) - Math.sin(lat1Rad) * Math.sin(lat2Rad)
+        );
+        
+        coords.push([lon2Rad * 180 / Math.PI, lat2Rad * 180 / Math.PI]);
+    }
+    
+    return {
+        type: 'Feature',
+        geometry: {
+            type: 'Polygon',
+            coordinates: [coords]
+        }
+    };
+};
 
 const CheckInMap = ({ onCheckIn, onClose }) => {
     const [academiaLocation, setAcademiaLocation] = useState(null);
@@ -11,182 +59,183 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [checkingIn, setCheckingIn] = useState(false);
-    const [libLoaded, setLibLoaded] = useState(false);
-    
-    // Refs para manipular o DOM e a instância do mapa diretamente
-    const mapContainerRef = useRef(null);
-    const mapInstanceRef = useRef(null);
-    const userMarkerRef = useRef(null);
-    const circleRef = useRef(null);
+    const [mapViewState, setMapViewState] = useState({
+        longitude: -45.4211,
+        latitude: -23.6183,
+        zoom: 16
+    });
+    const [showUserPopup, setShowUserPopup] = useState(false);
+    const watchPositionIdRef = useRef(null);
 
-    // 1. Carregar Leaflet e CSS dinamicamente
-    useEffect(() => {
-        const loadLeaflet = async () => {
-            if (typeof window === 'undefined') return;
-
-            try {
-                if (!L) {
-                    const leafletModule = await import('leaflet');
-                    await import('leaflet/dist/leaflet.css');
-                    L = leafletModule.default;
-
-                    // Corrigir ícones padrão do Leaflet
-                    delete L.Icon.Default.prototype._getIconUrl;
-                    L.Icon.Default.mergeOptions({
-                        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-                        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                    });
-                }
-                setLibLoaded(true);
-            } catch (err) {
-                console.error("Erro ao carregar Leaflet:", err);
-                setError("Falha ao carregar biblioteca de mapas.");
-            }
-        };
-        loadLeaflet();
-    }, []);
-
-    // 2. Buscar Dados (Academia e Usuário)
+    // Buscar dados da academia e localização do usuário
     useEffect(() => {
         const fetchData = async () => {
             try {
                 // Buscar Academia
                 const academiaRes = await axios.get('/api/aluno/academia');
-                let locAcademia = null;
                 
                 if (academiaRes.data?.localizacao) {
-                    locAcademia = {
+                    const locAcademia = {
                         lat: academiaRes.data.localizacao.latitude,
                         lng: academiaRes.data.localizacao.longitude,
                         raio: academiaRes.data.localizacao.raioMetros || 100
                     };
                     setAcademiaLocation(locAcademia);
+                    setMapViewState({
+                        longitude: locAcademia.lng,
+                        latitude: locAcademia.lat,
+                        zoom: 16
+                    });
                 } else {
-                    // Fallback
-                    locAcademia = { lat: -23.5505, lng: -46.6333, raio: 100 };
-                    setAcademiaLocation(locAcademia);
+                    setError('Localização da academia não encontrada.');
                 }
 
-                // Buscar Usuário
+                // Buscar Localização do Usuário
                 if (!navigator.geolocation) {
-                    setError('Geolocalização não suportada.');
+                    setError('Geolocalização não suportada neste dispositivo.');
                 } else {
+                    const geoOptions = {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0
+                    };
+
+                    // Primeira localização rápida
                     navigator.geolocation.getCurrentPosition(
                         (pos) => {
-                            setUserLocation({
+                            const newLocation = {
                                 lat: pos.coords.latitude,
-                                lng: pos.coords.longitude
-                            });
+                                lng: pos.coords.longitude,
+                                accuracy: pos.coords.accuracy
+                            };
+                            setUserLocation(newLocation);
+                            setMapViewState(prev => ({
+                                ...prev,
+                                longitude: newLocation.lng,
+                                latitude: newLocation.lat
+                            }));
                         },
                         (err) => {
-                            console.error(err);
-                            setError('Permissão de localização negada ou indisponível.');
+                            console.error('Erro ao obter localização:', err);
                         },
-                        { enableHighAccuracy: true, timeout: 10000 }
+                        geoOptions
+                    );
+
+                    // Monitoramento contínuo para melhor precisão
+                    watchPositionIdRef.current = navigator.geolocation.watchPosition(
+                        (pos) => {
+                            const newLocation = {
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude,
+                                accuracy: pos.coords.accuracy
+                            };
+                            
+                            setUserLocation(prev => {
+                                if (!prev || !prev.accuracy || newLocation.accuracy < prev.accuracy) {
+                                    return newLocation;
+                                }
+                                if (prev.lat && prev.lng) {
+                                    const dist = calcularDistancia(
+                                        prev.lat, prev.lng,
+                                        newLocation.lat, newLocation.lng
+                                    );
+                                    if (dist > 10) {
+                                        return newLocation;
+                                    }
+                                }
+                                return prev;
+                            });
+                            
+                            setMapViewState(prev => ({
+                                ...prev,
+                                longitude: newLocation.lng,
+                                latitude: newLocation.lat
+                            }));
+                            
+                            setError(null);
+                        },
+                        (err) => {
+                            let errorMsg = 'Erro ao obter localização.';
+                            switch(err.code) {
+                                case err.PERMISSION_DENIED:
+                                    errorMsg = 'Permissão de localização negada.';
+                                    break;
+                                case err.POSITION_UNAVAILABLE:
+                                    errorMsg = 'Localização indisponível. Verifique o GPS.';
+                                    break;
+                                case err.TIMEOUT:
+                                    errorMsg = 'Tempo esgotado. Verifique se está em área aberta.';
+                                    break;
+                            }
+                            setError(errorMsg);
+                        },
+                        geoOptions
                     );
                 }
             } catch (err) {
-                console.error(err);
+                console.error('Erro ao carregar dados:', err);
                 setError(err.response?.data?.message || 'Erro ao carregar dados.');
-                // Define um fallback para não travar a tela
-                setAcademiaLocation({ lat: -23.5505, lng: -46.6333, raio: 100 });
             } finally {
                 setLoading(false);
             }
         };
+
         fetchData();
-    }, []);
 
-    // 3. Inicializar e Controlar o Mapa (A Lógica "Manual" que resolve o erro)
-    useEffect(() => {
-        // Só roda se a lib carregou, se temos o container HTML e a localização da academia
-        if (!libLoaded || !mapContainerRef.current || !academiaLocation || !L) return;
-
-        // Se o mapa já existe, não recria, apenas atualiza
-        if (!mapInstanceRef.current) {
-            try {
-                // Criação do Mapa
-                const map = L.map(mapContainerRef.current).setView(
-                    [academiaLocation.lat, academiaLocation.lng], 
-                    16
-                );
-
-                // Camada de Tiles (OpenStreetMap)
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(map);
-
-                // Marcador da Academia
-                const greenIcon = L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-                    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
-                });
-
-                L.marker([academiaLocation.lat, academiaLocation.lng], { icon: greenIcon })
-                    .addTo(map)
-                    .bindPopup(`<b>Academia</b><br>Raio: ${academiaLocation.raio}m`);
-
-                // Círculo da Academia
-                circleRef.current = L.circle([academiaLocation.lat, academiaLocation.lng], {
-                    color: '#22c55e',
-                    fillColor: '#22c55e',
-                    fillOpacity: 0.2,
-                    radius: academiaLocation.raio
-                }).addTo(map);
-
-                mapInstanceRef.current = map;
-            } catch (e) {
-                console.error("Erro ao inicializar mapa", e);
-            }
-        }
-
-        // Cleanup: remove o mapa quando o componente desmonta
+        // Cleanup
         return () => {
-            if (mapInstanceRef.current) {
-                mapInstanceRef.current.remove();
-                mapInstanceRef.current = null;
-                userMarkerRef.current = null;
-                circleRef.current = null;
+            if (watchPositionIdRef.current !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(watchPositionIdRef.current);
             }
         };
-    }, [libLoaded, academiaLocation]); // Dependências controladas
+    }, []);
 
-    // 4. Atualizar marcador do usuário quando a localização muda
-    useEffect(() => {
-        if (!mapInstanceRef.current || !userLocation || !L || !academiaLocation) return;
-
-        const isInside = calcularDistancia(
-            userLocation.lat, userLocation.lng,
-            academiaLocation.lat, academiaLocation.lng
-        ) <= academiaLocation.raio;
-
-        const iconUrl = isInside 
-            ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png'
-            : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png';
-
-        const userIcon = L.icon({
-            iconUrl: iconUrl,
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
-        });
-
-        // Se já existe marcador, remove ou atualiza
-        if (userMarkerRef.current) {
-            userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
-            userMarkerRef.current.setIcon(userIcon);
-        } else {
-            // Cria novo marcador
-            userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
-                .addTo(mapInstanceRef.current)
-                .bindPopup('Você está aqui');
+    const atualizarLocalizacao = () => {
+        if (!navigator.geolocation) {
+            setError('Geolocalização não suportada.');
+            return;
         }
 
-        // Centraliza no usuário
-        mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 16);
+        setError(null);
+        setUserLocation(null);
 
-    }, [userLocation, academiaLocation]);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const newLocation = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy
+                };
+                setUserLocation(newLocation);
+                setMapViewState(prev => ({
+                    ...prev,
+                    longitude: newLocation.lng,
+                    latitude: newLocation.lat
+                }));
+            },
+            (err) => {
+                let errorMsg = 'Erro ao atualizar localização.';
+                switch(err.code) {
+                    case err.PERMISSION_DENIED:
+                        errorMsg = 'Permissão de localização negada.';
+                        break;
+                    case err.POSITION_UNAVAILABLE:
+                        errorMsg = 'Localização indisponível. Verifique o GPS.';
+                        break;
+                    case err.TIMEOUT:
+                        errorMsg = 'Tempo esgotado. Tente novamente.';
+                        break;
+                }
+                setError(errorMsg);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0
+            }
+        );
+    };
 
-    // Funções auxiliares
     const handleCheckIn = async () => {
         if (!userLocation) return;
         setCheckingIn(true);
@@ -203,24 +252,16 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
         }
     };
 
-    const calcularDistancia = (lat1, lon1, lat2, lon2) => {
-        const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    };
-
     const dentroDoRaio = academiaLocation && userLocation
         ? calcularDistancia(userLocation.lat, userLocation.lng, academiaLocation.lat, academiaLocation.lng) <= academiaLocation.raio
         : false;
 
-    // --- RENDERIZAÇÃO ---
     if (loading) {
-        return <div className="card" style={{padding: '3rem', textAlign: 'center', color: '#ccc'}}>Carregando...</div>;
+        return (
+            <div className="card" style={{padding: '3rem', textAlign: 'center', color: '#ccc'}}>
+                Carregando mapa...
+            </div>
+        );
     }
 
     if (error && !academiaLocation) {
@@ -241,18 +282,150 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
 
             {/* Container do Mapa */}
             <div style={{ height: '400px', width: '100%', background: '#1e293b', position: 'relative' }}>
-                {!libLoaded && (
-                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b'}}>
-                        Carregando biblioteca de mapas...
-                    </div>
-                )}
-                {/* A div onde o Leaflet será injetado */}
-                <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />
+                <Map
+                    {...mapViewState}
+                    onMove={evt => setMapViewState(evt.viewState)}
+                    mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                    style={{ width: '100%', height: '100%' }}
+                    reuseMaps={true}
+                >
+                    {/* Círculo da área permitida da academia */}
+                    {academiaLocation && (() => {
+                        const circleGeoJSON = criarCirculoGeoJSON(
+                            { lat: academiaLocation.lat, lng: academiaLocation.lng },
+                            academiaLocation.raio
+                        );
+                        return (
+                            <Source id="academia-circle" type="geojson" data={circleGeoJSON}>
+                                <Layer
+                                    id="academia-circle-fill"
+                                    type="fill"
+                                    paint={{
+                                        'fill-color': '#22c55e',
+                                        'fill-opacity': 0.2
+                                    }}
+                                />
+                                <Layer
+                                    id="academia-circle-stroke"
+                                    type="line"
+                                    paint={{
+                                        'line-color': '#22c55e',
+                                        'line-width': 2
+                                    }}
+                                />
+                            </Source>
+                        );
+                    })()}
+
+                    {/* Marcador da Academia */}
+                    {academiaLocation && (
+                        <Marker
+                            longitude={academiaLocation.lng}
+                            latitude={academiaLocation.lat}
+                            anchor="bottom"
+                        >
+                            <div style={{
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '50%',
+                                background: '#22c55e',
+                                border: '3px solid white',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                cursor: 'pointer'
+                            }}
+                            onClick={() => {}}
+                            />
+                        </Marker>
+                    )}
+
+                    {/* Marcador do Usuário */}
+                    {userLocation && (
+                        <Marker
+                            longitude={userLocation.lng}
+                            latitude={userLocation.lat}
+                            anchor="bottom"
+                        >
+                            <div style={{
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '50%',
+                                background: dentroDoRaio ? '#3b82f6' : '#ef4444',
+                                border: '3px solid white',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                cursor: 'pointer'
+                            }}
+                            onClick={() => setShowUserPopup(true)}
+                            />
+                        </Marker>
+                    )}
+
+                    {/* Popup do Usuário */}
+                    {userLocation && showUserPopup && (
+                        <Popup
+                            longitude={userLocation.lng}
+                            latitude={userLocation.lat}
+                            anchor="bottom"
+                            onClose={() => setShowUserPopup(false)}
+                            closeButton={true}
+                            closeOnClick={false}
+                        >
+                            <div style={{ color: '#030a12', padding: '8px' }}>
+                                <strong>📍 Sua Localização</strong>
+                                <br />
+                                {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+                                <br />
+                                {academiaLocation && (
+                                    <>
+                                        Distância: {Math.round(calcularDistancia(userLocation.lat, userLocation.lng, academiaLocation.lat, academiaLocation.lng))}m
+                                        <br />
+                                        {dentroDoRaio ? '✅ Dentro do raio' : '❌ Fora do raio'}
+                                    </>
+                                )}
+                                {userLocation.accuracy && (
+                                    <>
+                                        <br />
+                                        Precisão: ±{Math.round(userLocation.accuracy)}m
+                                    </>
+                                )}
+                            </div>
+                        </Popup>
+                    )}
+                </Map>
             </div>
 
             <div style={{ padding: '1rem' }}>
                 {error && <div style={{ color: '#f87171', marginBottom: '1rem', padding: '0.5rem', background: 'rgba(248,113,113,0.1)', borderRadius: '4px' }}>{error}</div>}
                 
+                {!userLocation && (
+                    <div style={{ 
+                        padding: '10px', 
+                        borderRadius: '8px', 
+                        textAlign: 'center',
+                        marginBottom: '1rem',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        color: '#60a5fa',
+                        border: '1px solid #60a5fa'
+                    }}>
+                        📍 Obtendo sua localização GPS... Aguarde um momento para melhor precisão.
+                        <br />
+                        <button 
+                            onClick={atualizarLocalizacao}
+                            style={{
+                                marginTop: '8px',
+                                padding: '6px 12px',
+                                background: '#3b82f6',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem'
+                            }}
+                        >
+                            🔄 Atualizar Localização
+                        </button>
+                    </div>
+                )}
+
                 {userLocation && academiaLocation && (
                     <div style={{ 
                         padding: '10px', 
@@ -266,6 +439,32 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                         {dentroDoRaio 
                             ? "✅ Você está na área permitida!" 
                             : `⚠️ Você está longe (${Math.round(calcularDistancia(userLocation.lat, userLocation.lng, academiaLocation.lat, academiaLocation.lng))}m)`}
+                        {userLocation.accuracy && (
+                            <div style={{ fontSize: '0.85rem', marginTop: '4px', opacity: 0.8 }}>
+                                Precisão GPS: ±{Math.round(userLocation.accuracy)}m
+                                {userLocation.accuracy > 50 && (
+                                    <span style={{ color: '#fbbf24', marginLeft: '8px' }}>
+                                        ⚠️ Precisão baixa - saia para área aberta
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        <button 
+                            onClick={atualizarLocalizacao}
+                            style={{
+                                marginTop: '8px',
+                                padding: '6px 12px',
+                                background: 'rgba(59, 130, 246, 0.2)',
+                                color: '#60a5fa',
+                                border: '1px solid #60a5fa',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                width: '100%'
+                            }}
+                        >
+                            🔄 Atualizar Minha Localização
+                        </button>
                     </div>
                 )}
 
