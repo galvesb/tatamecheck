@@ -11,6 +11,7 @@ const ConfiguracoesPage = () => {
     const [success, setSuccess] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [editingFaixa, setEditingFaixa] = useState(null);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [formData, setFormData] = useState({
         nome: '',
         ordem: 1,
@@ -19,6 +20,14 @@ const ConfiguracoesPage = () => {
         numeroMaximoGraus: 4,
         graus: []
     });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         if (user?.role === 'admin') {
@@ -178,8 +187,15 @@ const ConfiguracoesPage = () => {
     return (
         <div>
             <div className="card" style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h2>Configurações de Faixas e Graus</h2>
+                <div style={{ 
+                    display: 'flex', 
+                    flexDirection: isMobile ? 'column' : 'row',
+                    justifyContent: 'space-between', 
+                    alignItems: isMobile ? 'stretch' : 'center', 
+                    gap: isMobile ? '1rem' : '0',
+                    marginBottom: '1rem' 
+                }}>
+                    <h2 style={{ margin: 0, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>Configurações de Faixas e Graus</h2>
                     <button
                         className="btn primary"
                         onClick={() => {
@@ -187,6 +203,7 @@ const ConfiguracoesPage = () => {
                             setEditingFaixa(null);
                             setShowForm(true);
                         }}
+                        style={{ width: isMobile ? '100%' : 'auto' }}
                     >
                         ➕ Nova Faixa
                     </button>
@@ -236,20 +253,43 @@ const ConfiguracoesPage = () => {
                                     border: '1px solid rgba(255, 255, 255, 0.1)'
                                 }}
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                                    <div>
-                                        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexDirection: isMobile ? 'column' : 'row',
+                                    justifyContent: 'space-between', 
+                                    alignItems: isMobile ? 'stretch' : 'start', 
+                                    gap: isMobile ? '1rem' : '0.5rem',
+                                    marginBottom: '0.5rem' 
+                                }}>
+                                    <div style={{ flex: 1 }}>
+                                        <h3 style={{ margin: 0, marginBottom: '0.5rem', fontSize: isMobile ? '1rem' : '1.2rem' }}>
                                             {faixa.ordem}. {faixa.nome}
                                         </h3>
-                                        <p style={{ color: 'rgba(226, 232, 240, 0.7)', fontSize: '0.9rem', margin: 0 }}>
-                                            Tempo mínimo: {faixa.tempoMinimoAnos > 0 && `${faixa.tempoMinimoAnos} ano(s) e `}{faixa.tempoMinimoMeses} mês(es) | 
+                                        <p style={{ 
+                                            color: 'rgba(226, 232, 240, 0.7)', 
+                                            fontSize: isMobile ? '0.8rem' : '0.9rem', 
+                                            margin: 0,
+                                            lineHeight: '1.4'
+                                        }}>
+                                            Tempo mínimo: {faixa.tempoMinimoAnos > 0 && `${faixa.tempoMinimoAnos} ano(s) e `}{faixa.tempoMinimoMeses} mês(es)
+                                            {!isMobile && ' | '}
+                                            {isMobile && <br />}
                                             Máximo de graus: {faixa.numeroMaximoGraus}
                                         </p>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        flexDirection: isMobile ? 'column' : 'row',
+                                        gap: '0.5rem',
+                                        width: isMobile ? '100%' : 'auto'
+                                    }}>
                                         <button
                                             className="btn secondary"
-                                            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                                            style={{ 
+                                                padding: '0.5rem 1rem', 
+                                                fontSize: '0.85rem',
+                                                width: isMobile ? '100%' : 'auto'
+                                            }}
                                             onClick={() => handleEdit(faixa)}
                                         >
                                             ✏️ Editar
@@ -261,7 +301,8 @@ const ConfiguracoesPage = () => {
                                                 fontSize: '0.85rem',
                                                 background: 'rgba(244, 63, 94, 0.2)',
                                                 color: '#f87171',
-                                                border: '1px solid rgba(244, 63, 94, 0.3)'
+                                                border: '1px solid rgba(244, 63, 94, 0.3)',
+                                                width: isMobile ? '100%' : 'auto'
                                             }}
                                             onClick={() => handleDelete(faixa.nome)}
                                         >
@@ -300,7 +341,7 @@ const ConfiguracoesPage = () => {
             {/* Formulário de Cadastro/Edição */}
             {showForm && (
                 <div className="card">
-                    <h2>{editingFaixa ? 'Editar Faixa' : 'Nova Faixa'}</h2>
+                    <h2 style={{ fontSize: isMobile ? '1.2rem' : '1.5rem' }}>{editingFaixa ? 'Editar Faixa' : 'Nova Faixa'}</h2>
                     <form onSubmit={handleSubmit}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                             <div>
@@ -324,9 +365,13 @@ const ConfiguracoesPage = () => {
                                 />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+                                gap: '1rem' 
+                            }}>
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)', fontSize: isMobile ? '0.9rem' : '1rem' }}>
                                         Ordem *
                                     </label>
                                     <input
@@ -341,13 +386,14 @@ const ConfiguracoesPage = () => {
                                             borderRadius: '8px',
                                             background: 'rgba(255, 255, 255, 0.1)',
                                             border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            color: '#fff'
+                                            color: '#fff',
+                                            fontSize: '1rem'
                                         }}
                                     />
                                 </div>
 
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)', fontSize: isMobile ? '0.9rem' : '1rem' }}>
                                         Número Máximo de Graus *
                                     </label>
                                     <input
@@ -363,15 +409,20 @@ const ConfiguracoesPage = () => {
                                             borderRadius: '8px',
                                             background: 'rgba(255, 255, 255, 0.1)',
                                             border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            color: '#fff'
+                                            color: '#fff',
+                                            fontSize: '1rem'
                                         }}
                                     />
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+                                gap: '1rem' 
+                            }}>
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)', fontSize: isMobile ? '0.9rem' : '1rem' }}>
                                         Tempo Mínimo (Anos)
                                     </label>
                                     <input
@@ -385,13 +436,14 @@ const ConfiguracoesPage = () => {
                                             borderRadius: '8px',
                                             background: 'rgba(255, 255, 255, 0.1)',
                                             border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            color: '#fff'
+                                            color: '#fff',
+                                            fontSize: '1rem'
                                         }}
                                     />
                                 </div>
 
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(226, 232, 240, 0.9)', fontSize: isMobile ? '0.9rem' : '1rem' }}>
                                         Tempo Mínimo (Meses) *
                                     </label>
                                     <input
@@ -406,21 +458,36 @@ const ConfiguracoesPage = () => {
                                             borderRadius: '8px',
                                             background: 'rgba(255, 255, 255, 0.1)',
                                             border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            color: '#fff'
+                                            color: '#fff',
+                                            fontSize: '1rem'
                                         }}
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <label style={{ color: 'rgba(226, 232, 240, 0.9)' }}>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexDirection: isMobile ? 'column' : 'row',
+                                    justifyContent: 'space-between', 
+                                    alignItems: isMobile ? 'stretch' : 'center', 
+                                    gap: isMobile ? '0.75rem' : '0.5rem',
+                                    marginBottom: '0.5rem' 
+                                }}>
+                                    <label style={{ 
+                                        color: 'rgba(226, 232, 240, 0.9)',
+                                        fontSize: isMobile ? '0.9rem' : '1rem'
+                                    }}>
                                         Graus ({formData.graus.length}/{formData.numeroMaximoGraus}) *
                                     </label>
                                     <button
                                         type="button"
                                         className="btn secondary"
-                                        style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                                        style={{ 
+                                            padding: '0.5rem 1rem', 
+                                            fontSize: '0.85rem',
+                                            width: isMobile ? '100%' : 'auto'
+                                        }}
                                         onClick={adicionarGrau}
                                         disabled={formData.graus.length >= formData.numeroMaximoGraus}
                                     >
@@ -439,7 +506,7 @@ const ConfiguracoesPage = () => {
                                         key={index}
                                         style={{
                                             display: 'grid',
-                                            gridTemplateColumns: '100px 1fr auto',
+                                            gridTemplateColumns: isMobile ? '1fr auto' : '100px 1fr auto',
                                             gap: '0.5rem',
                                             alignItems: 'center',
                                             marginBottom: '0.5rem',
@@ -449,7 +516,11 @@ const ConfiguracoesPage = () => {
                                             border: '1px solid rgba(255, 255, 255, 0.1)'
                                         }}
                                     >
-                                        <span style={{ color: 'rgba(226, 232, 240, 0.7)', fontSize: '0.9rem' }}>
+                                        <span style={{ 
+                                            color: 'rgba(226, 232, 240, 0.7)', 
+                                            fontSize: isMobile ? '0.85rem' : '0.9rem',
+                                            gridColumn: isMobile ? '1 / -1' : 'auto'
+                                        }}>
                                             {grau.numero}º Grau
                                         </span>
                                         <input
@@ -464,36 +535,50 @@ const ConfiguracoesPage = () => {
                                                 borderRadius: '6px',
                                                 background: 'rgba(255, 255, 255, 0.1)',
                                                 border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                color: '#fff'
+                                                color: '#fff',
+                                                fontSize: '1rem',
+                                                width: '100%'
                                             }}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => removerGrau(index)}
                                             style={{
-                                                padding: '0.5rem',
+                                                padding: isMobile ? '0.5rem 1rem' : '0.5rem',
                                                 background: 'rgba(244, 63, 94, 0.2)',
                                                 color: '#f87171',
                                                 border: '1px solid rgba(244, 63, 94, 0.3)',
                                                 borderRadius: '6px',
-                                                cursor: 'pointer'
+                                                cursor: 'pointer',
+                                                fontSize: isMobile ? '0.85rem' : '1rem',
+                                                whiteSpace: 'nowrap'
                                             }}
                                         >
-                                            🗑️
+                                            {isMobile ? '🗑️ Remover' : '🗑️'}
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button type="submit" className="btn primary" style={{ flex: 1 }}>
+                        <div style={{ 
+                            display: 'flex', 
+                            flexDirection: isMobile ? 'column' : 'row',
+                            gap: '1rem' 
+                        }}>
+                            <button type="submit" className="btn primary" style={{ 
+                                flex: 1,
+                                width: isMobile ? '100%' : 'auto'
+                            }}>
                                 {editingFaixa ? '💾 Salvar Alterações' : '✅ Criar Faixa'}
                             </button>
                             <button
                                 type="button"
                                 className="btn secondary"
-                                style={{ flex: 1 }}
+                                style={{ 
+                                    flex: 1,
+                                    width: isMobile ? '100%' : 'auto'
+                                }}
                                 onClick={() => {
                                     setShowForm(false);
                                     setEditingFaixa(null);
