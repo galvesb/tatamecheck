@@ -3,7 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import PresencaPage from './modules/PresencaPage';
 import FinanceiroPage from './modules/FinanceiroPage';
+import ProgressoPage from './modules/ProgressoPage';
 import MidiaPage from './modules/MidiaPage';
+import ConfiguracoesPage from './modules/ConfiguracoesPage';
 import GerenciarAlunos from './GerenciarAlunos';
 import '../index.css';
 
@@ -33,6 +35,16 @@ const Dashboard = () => {
     }
 
     const getModules = () => {
+        // Módulos para alunos
+        if (user?.role === 'aluno') {
+            return [
+                { id: 'presenca', name: 'Presença', icon: '📍', color: '#1cb0f6' },
+                { id: 'progresso', name: 'Progresso', icon: '📊', color: '#58cc02' },
+                { id: 'midia', name: 'Mídia', icon: '📱', color: '#8b5cf6' }
+            ];
+        }
+
+        // Módulos para professores e admins
         const baseModules = [
             { id: 'presenca', name: 'Presença', icon: '📍', color: '#1cb0f6' },
             { id: 'financeiro', name: 'Financeiro', icon: '💰', color: '#58cc02' },
@@ -42,6 +54,11 @@ const Dashboard = () => {
         // Adicionar módulo de gerenciamento para professores e admins
         if (user?.role === 'professor' || user?.role === 'admin') {
             baseModules.push({ id: 'alunos', name: 'Alunos', icon: '👥', color: '#f59e0b' });
+        }
+
+        // Adicionar módulo de configurações apenas para admins
+        if (user?.role === 'admin') {
+            baseModules.push({ id: 'configuracoes', name: 'Configurações', icon: '⚙️', color: '#ef4444' });
         }
 
         return baseModules;
@@ -55,10 +72,14 @@ const Dashboard = () => {
                 return <PresencaPage />;
             case 'financeiro':
                 return <FinanceiroPage />;
+            case 'progresso':
+                return <ProgressoPage />;
             case 'midia':
                 return <MidiaPage />;
             case 'alunos':
                 return <GerenciarAlunos />;
+            case 'configuracoes':
+                return <ConfiguracoesPage />;
             default:
                 return <PresencaPage />;
         }

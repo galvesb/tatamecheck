@@ -26,6 +26,18 @@ const AlunoSchema = new mongoose.Schema({
         type: Number, 
         default: 50 
     },
+    // Campos para sistema baseado em meses
+    mesesDesdeUltimaGraduacao: {
+        type: Number,
+        default: 0
+    },
+    mesesNecessariosParaProximoGrau: {
+        type: Number,
+        default: 0
+    },
+    dataUltimaGraduacao: {
+        type: Date
+    },
     ultimaGraduacao: {
         data: { type: Date },
         faixa: { type: String },

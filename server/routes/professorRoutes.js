@@ -258,11 +258,183 @@ router.get('/academia', async (req, res) => {
                 latitude: academia.localizacao.latitude,
                 longitude: academia.localizacao.longitude,
                 raioMetros: academia.localizacao.raioMetros
+            },
+            configuracoes: {
+                faixas: academia.configuracoes?.faixas || []
             }
         });
     } catch (err) {
         console.error('Erro ao buscar academia:', err);
         res.status(500).json({ message: 'Erro ao buscar academia', error: err.message });
+    }
+});
+
+// ====== ROTAS DE CONFIGURAÇÃO DE FAIXAS E GRAUS ======
+
+// Obter todas as configurações de faixas
+router.get('/configuracoes/faixas', async (req, res) => {
+    try {
+        const academia = await Academia.findOne();
+        
+        if (!academia) {
+            return res.status(404).json({ message: 'Academia não configurada' });
+        }
+
+        res.json({
+            faixas: academia.configuracoes?.faixas || []
+        });
+    } catch (err) {
+        console.error('Erro ao buscar configurações de faixas:', err);
+        res.status(500).json({ message: 'Erro ao buscar configurações', error: err.message });
+    }
+});
+
+// Criar ou atualizar configuração de faixa
+router.post('/configuracoes/faixas', async (req, res) => {
+    try {
+        const { nome, ordem, tempoMinimoMeses, tempoMinimoAnos, numeroMaximoGraus, graus } = req.body;
+
+        if (!nome || !ordem || !numeroMaximoGraus || !graus || !Array.isArray(graus)) {
+            return res.status(400).json({ 
+                message: 'Nome, ordem, número máximo de graus e array de graus são obrigatórios' 
+            });
+        }
+
+        // Validar que pelo menos um tempo (anos ou meses) foi definido
+        const tempoMeses = parseInt(tempoMinimoMeses) || 0;
+        const tempoAnos = parseInt(tempoMinimoAnos) || 0;
+        if (tempoMeses === 0 && tempoAnos === 0) {
+            return res.status(400).json({ 
+                message: 'Pelo menos um tempo mínimo (anos ou meses) deve ser maior que zero' 
+            });
+        }
+
+        let academia = await Academia.findOne();
+        
+        if (!academia) {
+            return res.status(404).json({ message: 'Academia não configurada. Configure a academia primeiro.' });
+        }
+
+        // Validar graus
+        if (graus.length === 0 || graus.length > numeroMaximoGraus) {
+            return res.status(400).json({ 
+                message: `O número de graus deve estar entre 1 e ${numeroMaximoGraus}` 
+            });
+        }
+
+        // Verificar se a faixa já existe
+        if (!academia.configuracoes.faixas) {
+            academia.configuracoes.faixas = [];
+        }
+
+        const faixaIndex = academia.configuracoes.faixas.findIndex(f => f.nome === nome);
+
+        const novaFaixa = {
+            nome: nome.trim(),
+            ordem: parseInt(ordem),
+            tempoMinimoMeses: parseInt(tempoMinimoMeses) || 0,
+            tempoMinimoAnos: parseInt(tempoMinimoAnos) || 0,
+            numeroMaximoGraus: parseInt(numeroMaximoGraus),
+            graus: graus.map(g => ({
+                numero: parseInt(g.numero),
+                tempoMinimoMeses: parseInt(g.tempoMinimoMeses)
+            })).sort((a, b) => a.numero - b.numero)
+        };
+
+        if (faixaIndex >= 0) {
+            // Atualizar faixa existente
+            academia.configuracoes.faixas[faixaIndex] = novaFaixa;
+        } else {
+            // Adicionar nova faixa
+            academia.configuracoes.faixas.push(novaFaixa);
+        }
+
+        // Ordenar faixas por ordem
+        academia.configuracoes.faixas.sort((a, b) => a.ordem - b.ordem);
+
+        await academia.save();
+
+        res.json({
+            message: faixaIndex >= 0 ? 'Faixa atualizada com sucesso' : 'Faixa criada com sucesso',
+            faixa: novaFaixa
+        });
+    } catch (err) {
+        console.error('Erro ao salvar configuração de faixa:', err);
+        res.status(500).json({ message: 'Erro ao salvar configuração', error: err.message });
+    }
+});
+
+// Atualizar uma faixa específica
+router.put('/configuracoes/faixas/:nome', async (req, res) => {
+    try {
+        const { nome } = req.params;
+        const { ordem, tempoMinimoMeses, tempoMinimoAnos, numeroMaximoGraus, graus } = req.body;
+
+        const academia = await Academia.findOne();
+        
+        if (!academia || !academia.configuracoes?.faixas) {
+            return res.status(404).json({ message: 'Academia não configurada ou faixa não encontrada' });
+        }
+
+        const faixaIndex = academia.configuracoes.faixas.findIndex(f => f.nome === nome);
+        
+        if (faixaIndex < 0) {
+            return res.status(404).json({ message: 'Faixa não encontrada' });
+        }
+
+        // Atualizar campos fornecidos
+        if (ordem !== undefined) academia.configuracoes.faixas[faixaIndex].ordem = parseInt(ordem);
+        if (tempoMinimoMeses !== undefined) academia.configuracoes.faixas[faixaIndex].tempoMinimoMeses = parseInt(tempoMinimoMeses);
+        if (tempoMinimoAnos !== undefined) academia.configuracoes.faixas[faixaIndex].tempoMinimoAnos = parseInt(tempoMinimoAnos);
+        if (numeroMaximoGraus !== undefined) academia.configuracoes.faixas[faixaIndex].numeroMaximoGraus = parseInt(numeroMaximoGraus);
+        if (graus && Array.isArray(graus)) {
+            academia.configuracoes.faixas[faixaIndex].graus = graus.map(g => ({
+                numero: parseInt(g.numero),
+                tempoMinimoMeses: parseInt(g.tempoMinimoMeses)
+            })).sort((a, b) => a.numero - b.numero);
+        }
+
+        // Reordenar
+        academia.configuracoes.faixas.sort((a, b) => a.ordem - b.ordem);
+
+        await academia.save();
+
+        res.json({
+            message: 'Faixa atualizada com sucesso',
+            faixa: academia.configuracoes.faixas[faixaIndex]
+        });
+    } catch (err) {
+        console.error('Erro ao atualizar faixa:', err);
+        res.status(500).json({ message: 'Erro ao atualizar faixa', error: err.message });
+    }
+});
+
+// Deletar uma faixa
+router.delete('/configuracoes/faixas/:nome', async (req, res) => {
+    try {
+        const { nome } = req.params;
+
+        const academia = await Academia.findOne();
+        
+        if (!academia || !academia.configuracoes?.faixas) {
+            return res.status(404).json({ message: 'Academia não configurada' });
+        }
+
+        const faixaIndex = academia.configuracoes.faixas.findIndex(f => f.nome === nome);
+        
+        if (faixaIndex < 0) {
+            return res.status(404).json({ message: 'Faixa não encontrada' });
+        }
+
+        academia.configuracoes.faixas.splice(faixaIndex, 1);
+        await academia.save();
+
+        res.json({
+            message: 'Faixa deletada com sucesso'
+        });
+    } catch (err) {
+        console.error('Erro ao deletar faixa:', err);
+        res.status(500).json({ message: 'Erro ao deletar faixa', error: err.message });
     }
 });
 
