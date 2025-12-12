@@ -8,6 +8,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const alunoRoutes = require('./routes/alunoRoutes');
 const professorRoutes = require('./routes/professorRoutes');
+const financeiroRoutes = require('./routes/financeiroRoutes');
 const { authMiddleware } = require('./middleware/authMiddleware');
 
 const app = express();
@@ -48,6 +49,7 @@ mongoose.connection.on('connected', () => {
 app.use('/api/auth', authRoutes);
 app.use('/api/aluno', alunoRoutes);
 app.use('/api/professor', professorRoutes);
+app.use('/api/financeiro', financeiroRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {

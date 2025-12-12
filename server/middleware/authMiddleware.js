@@ -34,5 +34,20 @@ const professorMiddleware = (req, res, next) => {
     }
 };
 
-module.exports = { authMiddleware, adminMiddleware, professorMiddleware, JWT_SECRET };
+const requireRole = (roles) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ message: 'Authentication required' });
+        }
+        if (Array.isArray(roles) && roles.includes(req.user.role)) {
+            next();
+        } else if (req.user.role === roles) {
+            next();
+        } else {
+            res.status(403).json({ message: 'Access denied: Insufficient permissions' });
+        }
+    };
+};
+
+module.exports = { authMiddleware, adminMiddleware, professorMiddleware, requireRole, JWT_SECRET };
 
