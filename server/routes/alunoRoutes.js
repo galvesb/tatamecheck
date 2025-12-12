@@ -30,11 +30,6 @@ router.post('/checkin', async (req, res) => {
         const { latitude, longitude } = req.body;
         const userId = req.user.userId;
 
-        // Validar coordenadas
-        if (!latitude || !longitude) {
-            return res.status(400).json({ message: 'Coordenadas de localização são obrigatórias' });
-        }
-
         // Buscar aluno
         const aluno = await Aluno.findOne({ userId }).populate('academiaId');
         if (!aluno) {
@@ -61,35 +56,45 @@ router.post('/checkin', async (req, res) => {
             return res.status(400).json({ message: 'Você já fez check-in hoje' });
         }
 
-        // Calcular distância até a academia
-        const distancia = calcularDistancia(
-            latitude,
-            longitude,
-            academia.localizacao.latitude,
-            academia.localizacao.longitude
-        );
+        // Validar coordenadas se fornecidas
+        let dentroDoRaio = false;
+        let distancia = null;
+        let validada = false;
 
-        const dentroDoRaio = distancia <= academia.localizacao.raioMetros;
+        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+            // Calcular distância até a academia
+            distancia = calcularDistancia(
+                latitude,
+                longitude,
+                academia.localizacao.latitude,
+                academia.localizacao.longitude
+            );
 
-        if (!dentroDoRaio) {
-            return res.status(400).json({ 
-                message: `Você está muito longe da academia. Distância: ${Math.round(distancia)}m. Raio permitido: ${academia.localizacao.raioMetros}m`,
-                dentroDoRaio: false,
-                distancia: Math.round(distancia)
-            });
+            dentroDoRaio = distancia <= academia.localizacao.raioMetros;
+            validada = dentroDoRaio;
+
+            // Se estiver fora do raio, ainda permite check-in mas marca como não validado
+            if (!dentroDoRaio) {
+                // Ainda permite check-in, mas marca como não validado
+                // O professor pode validar manualmente depois
+            }
+        } else {
+            // Sem coordenadas válidas - permite check-in manual (não validado)
+            // Útil quando o GPS não funciona ou o mapa falha
         }
 
         // Criar registro de presença
         const presenca = new Presenca({
             alunoId: aluno._id,
             data: new Date(),
-            localizacao: {
+            localizacao: latitude && longitude ? {
                 latitude,
                 longitude,
                 raioAcademia: academia.localizacao.raioMetros,
-                dentroDoRaio: true
-            },
-            validada: true
+                dentroDoRaio: dentroDoRaio,
+                distancia: distancia ? Math.round(distancia) : null
+            } : null,
+            validada: validada
         });
 
         await presenca.save();
@@ -98,12 +103,20 @@ router.post('/checkin', async (req, res) => {
         aluno.diasPresencaDesdeUltimaGraduacao += 1;
         await aluno.save();
 
+        let mensagem = 'Check-in realizado com sucesso!';
+        if (!validada && latitude && longitude) {
+            mensagem = `Check-in realizado, mas você está fora do raio permitido (${Math.round(distancia)}m). O professor pode validar manualmente.`;
+        } else if (!validada && !latitude && !longitude) {
+            mensagem = 'Check-in realizado sem validação de localização. O professor pode validar manualmente.';
+        }
+
         res.json({
-            message: 'Check-in realizado com sucesso!',
+            message: mensagem,
             presenca: {
                 id: presenca._id,
                 data: presenca.data,
-                distancia: Math.round(distancia)
+                distancia: distancia ? Math.round(distancia) : null,
+                validada: validada
             },
             progresso: {
                 diasPresenca: aluno.diasPresencaDesdeUltimaGraduacao,
@@ -179,83 +192,62 @@ router.get('/progresso', async (req, res) => {
             .populate('avaliadoPor', 'name');
 
         // Calcular tempo restante para próximo grau e próxima faixa
+        // BASEADO EM DIAS DE PRESENÇA, não em tempo decorrido
         let tempoRestanteProximoGrau = null;
         let tempoRestanteProximaFaixa = null;
         let proximoGrau = null;
         let proximaFaixa = null;
 
+        // Dias de presença desde a última graduação
+        const diasPresenca = aluno.diasPresencaDesdeUltimaGraduacao || 0;
+
         if (academia?.configuracoes?.faixas && academia.configuracoes.faixas.length > 0) {
             // Encontrar configuração da faixa atual
             const faixaAtualConfig = academia.configuracoes.faixas.find(f => f.nome === aluno.faixaAtual);
             
-            // Calcular meses decorridos desde a última graduação
-            const dataUltimaGraduacao = aluno.ultimaGraduacao?.data || aluno.createdAt;
-            const agora = new Date();
-            const dataInicio = new Date(dataUltimaGraduacao);
-            
-            // Calcular diferença em meses de forma mais precisa
-            const anosDiff = agora.getFullYear() - dataInicio.getFullYear();
-            const mesesDiff = agora.getMonth() - dataInicio.getMonth();
-            const diasDiff = agora.getDate() - dataInicio.getDate();
-            let mesesDecorridos = anosDiff * 12 + mesesDiff;
-            
-            // Se os dias indicam que ainda não completou o mês atual, reduzir 1
-            if (diasDiff < 0) {
-                mesesDecorridos -= 1;
-            }
-            mesesDecorridos = Math.max(0, mesesDecorridos);
+            // Converter meses para dias (aproximação: 1 mês = 30 dias)
+            const converterMesesParaDias = (meses) => meses * 30;
 
             if (faixaAtualConfig) {
-                // Verificar se há próximo grau na faixa atual
-                const proximoGrauNum = aluno.grauAtual + 1;
-                const grauConfig = faixaAtualConfig.graus.find(g => g.numero === proximoGrauNum);
-
-                if (grauConfig) {
-                    // Há próximo grau na faixa atual
-                    proximoGrau = `${proximoGrauNum}º Grau`;
-                    const mesesNecessarios = grauConfig.tempoMinimoMeses;
-                    const mesesFaltantes = Math.max(0, mesesNecessarios - mesesDecorridos);
-                    tempoRestanteProximoGrau = {
-                        meses: mesesFaltantes,
-                        mesesNecessarios,
-                        mesesDecorridos,
-                        completo: mesesDecorridos >= mesesNecessarios
-                    };
-                }
-                
-                // Verificar se está no último grau da faixa para mostrar próxima faixa
+                // Verificar qual é o último grau da faixa atual
                 const ultimoGrauConfig = faixaAtualConfig.graus[faixaAtualConfig.graus.length - 1];
-                if (ultimoGrauConfig && aluno.grauAtual >= ultimoGrauConfig.numero) {
-                    // Aluno está no último grau ou além, precisa mudar de faixa
+                const estaNoUltimoGrau = ultimoGrauConfig && aluno.grauAtual >= ultimoGrauConfig.numero;
+
+                if (estaNoUltimoGrau) {
+                    // Aluno está no último grau da faixa, precisa mudar de faixa
                     const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
                     if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
                         proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
+                        // Converter tempo mínimo da faixa para dias
                         const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
-                        const mesesFaltantes = Math.max(0, mesesNecessarios - mesesDecorridos);
+                        const diasNecessarios = converterMesesParaDias(mesesNecessarios);
+                        const diasFaltantes = Math.max(0, diasNecessarios - diasPresenca);
                         tempoRestanteProximaFaixa = {
-                            meses: mesesFaltantes,
-                            mesesNecessarios,
-                            mesesDecorridos,
-                            completo: mesesDecorridos >= mesesNecessarios,
-                            nomeFaixa: proximaFaixa.nome
+                            dias: diasFaltantes,
+                            diasNecessarios,
+                            diasPresenca,
+                            completo: diasPresenca >= diasNecessarios,
+                            nomeFaixa: proximaFaixa.nome,
+                            mesesNecessarios // Manter para referência
                         };
-                        // Limpar próximo grau se já está no último
-                        tempoRestanteProximoGrau = null;
-                        proximoGrau = null;
                     }
-                } else if (!grauConfig) {
-                    // Não há próximo grau configurado, mostrar próxima faixa
-                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
-                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
-                        proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
-                        const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
-                        const mesesFaltantes = Math.max(0, mesesNecessarios - mesesDecorridos);
-                        tempoRestanteProximaFaixa = {
-                            meses: mesesFaltantes,
-                            mesesNecessarios,
-                            mesesDecorridos,
-                            completo: mesesDecorridos >= mesesNecessarios,
-                            nomeFaixa: proximaFaixa.nome
+                } else {
+                    // Verificar se há próximo grau na faixa atual
+                    const proximoGrauNum = aluno.grauAtual + 1;
+                    const grauConfig = faixaAtualConfig.graus.find(g => g.numero === proximoGrauNum);
+
+                    if (grauConfig) {
+                        // Há próximo grau na faixa atual
+                        proximoGrau = `${proximoGrauNum}º Grau`;
+                        // Converter meses necessários para dias
+                        const diasNecessarios = converterMesesParaDias(grauConfig.tempoMinimoMeses);
+                        const diasFaltantes = Math.max(0, diasNecessarios - diasPresenca);
+                        tempoRestanteProximoGrau = {
+                            dias: diasFaltantes,
+                            diasNecessarios,
+                            diasPresenca,
+                            completo: diasPresenca >= diasNecessarios,
+                            mesesNecessarios: grauConfig.tempoMinimoMeses // Manter para referência
                         };
                     }
                 }

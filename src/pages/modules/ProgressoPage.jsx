@@ -165,12 +165,55 @@ const ProgressoPage = () => {
                                 <span style={{ color: '#22c55e', fontWeight: 600 }}>✅ Elegível</span>
                             ) : (
                                 <span style={{ color: '#60a5fa', fontWeight: 600 }}>
-                                    {progresso.tempoRestanteProximoGrau.meses} mês(es) restante(s)
+                                    {progresso.tempoRestanteProximoGrau.dias} dia(s) restante(s)
                                 </span>
                             )}
                         </div>
+                        
+                        {/* Barra de Progresso para Próximo Grau */}
+                        {(() => {
+                            const percentual = progresso.tempoRestanteProximoGrau.diasNecessarios > 0
+                                ? Math.min(100, Math.round((progresso.tempoRestanteProximoGrau.diasPresenca / progresso.tempoRestanteProximoGrau.diasNecessarios) * 100))
+                                : 0;
+                            
+                            return (
+                                <div style={{ marginTop: '0.75rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        marginBottom: '0.5rem',
+                                        fontSize: '0.85rem',
+                                        color: 'rgba(226, 232, 240, 0.7)'
+                                    }}>
+                                        <span>
+                                            {progresso.tempoRestanteProximoGrau.diasPresenca} de {progresso.tempoRestanteProximoGrau.diasNecessarios} dias
+                                        </span>
+                                        <span>{percentual}%</span>
+                                    </div>
+                                    <div style={{
+                                        width: '100%',
+                                        height: '12px',
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '6px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <div style={{
+                                            width: `${percentual}%`,
+                                            height: '100%',
+                                            background: progresso.tempoRestanteProximoGrau.completo 
+                                                ? 'linear-gradient(90deg, #22c55e, #16a34a)' 
+                                                : 'linear-gradient(90deg, #60a5fa, #3b82f6)',
+                                            transition: 'width 0.3s ease'
+                                        }}></div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        
                         <div style={{ fontSize: '0.85rem', color: 'rgba(226, 232, 240, 0.7)' }}>
-                            Tempo decorrido: {progresso.tempoRestanteProximoGrau.mesesDecorridos} de {progresso.tempoRestanteProximoGrau.mesesNecessarios} meses necessários
+                            {progresso.tempoRestanteProximoGrau.mesesNecessarios && (
+                                <span>Requisito: {progresso.tempoRestanteProximoGrau.mesesNecessarios} mês(es) ({progresso.tempoRestanteProximoGrau.diasNecessarios} dias)</span>
+                            )}
                         </div>
                     </div>
                 )}
@@ -183,10 +226,10 @@ const ProgressoPage = () => {
                         borderRadius: '12px',
                         background: progresso.tempoRestanteProximaFaixa.completo 
                             ? 'rgba(34, 197, 94, 0.15)' 
-                            : 'rgba(251, 191, 36, 0.1)',
+                            : 'rgba(59, 130, 246, 0.1)',
                         border: `1px solid ${progresso.tempoRestanteProximaFaixa.completo 
                             ? 'rgba(34, 197, 94, 0.3)' 
-                            : 'rgba(251, 191, 36, 0.3)'}`,
+                            : 'rgba(59, 130, 246, 0.2)'}`,
                         fontSize: '0.9rem'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -196,13 +239,56 @@ const ProgressoPage = () => {
                             {progresso.tempoRestanteProximaFaixa.completo ? (
                                 <span style={{ color: '#22c55e', fontWeight: 600 }}>✅ Elegível</span>
                             ) : (
-                                <span style={{ color: '#fbbf24', fontWeight: 600 }}>
-                                    {progresso.tempoRestanteProximaFaixa.meses} mês(es) restante(s)
+                                <span style={{ color: '#60a5fa', fontWeight: 600 }}>
+                                    {progresso.tempoRestanteProximaFaixa.dias} dia(s) restante(s)
                                 </span>
                             )}
                         </div>
+                        
+                        {/* Barra de Progresso para Próxima Faixa */}
+                        {(() => {
+                            const percentual = progresso.tempoRestanteProximaFaixa.diasNecessarios > 0
+                                ? Math.min(100, Math.round((progresso.tempoRestanteProximaFaixa.diasPresenca / progresso.tempoRestanteProximaFaixa.diasNecessarios) * 100))
+                                : 0;
+                            
+                            return (
+                                <div style={{ marginTop: '0.75rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        marginBottom: '0.5rem',
+                                        fontSize: '0.85rem',
+                                        color: 'rgba(226, 232, 240, 0.7)'
+                                    }}>
+                                        <span>
+                                            {progresso.tempoRestanteProximaFaixa.diasPresenca} de {progresso.tempoRestanteProximaFaixa.diasNecessarios} dias
+                                        </span>
+                                        <span>{percentual}%</span>
+                                    </div>
+                                    <div style={{
+                                        width: '100%',
+                                        height: '12px',
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '6px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <div style={{
+                                            width: `${percentual}%`,
+                                            height: '100%',
+                                            background: progresso.tempoRestanteProximaFaixa.completo 
+                                                ? 'linear-gradient(90deg, #22c55e, #16a34a)' 
+                                                : 'linear-gradient(90deg, #60a5fa, #3b82f6)',
+                                            transition: 'width 0.3s ease'
+                                        }}></div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        
                         <div style={{ fontSize: '0.85rem', color: 'rgba(226, 232, 240, 0.7)' }}>
-                            Tempo decorrido: {progresso.tempoRestanteProximaFaixa.mesesDecorridos} de {progresso.tempoRestanteProximaFaixa.mesesNecessarios} meses necessários
+                            {progresso.tempoRestanteProximaFaixa.mesesNecessarios && (
+                                <span>Requisito: {progresso.tempoRestanteProximaFaixa.mesesNecessarios} mês(es) ({progresso.tempoRestanteProximaFaixa.diasNecessarios} dias)</span>
+                            )}
                         </div>
                     </div>
                 )}

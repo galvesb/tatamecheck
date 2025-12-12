@@ -12,10 +12,11 @@ const PresencaSchema = new mongoose.Schema({
         default: Date.now
     },
     localizacao: {
-        latitude: { type: Number, required: true },
-        longitude: { type: Number, required: true },
+        latitude: { type: Number },
+        longitude: { type: Number },
         raioAcademia: { type: Number }, // Raio em metros
-        dentroDoRaio: { type: Boolean, required: true }
+        dentroDoRaio: { type: Boolean },
+        distancia: { type: Number } // Distância em metros até a academia
     },
     validada: { 
         type: Boolean, 

@@ -59,6 +59,7 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [checkingIn, setCheckingIn] = useState(false);
+    const [mapError, setMapError] = useState(false);
     const [mapViewState, setMapViewState] = useState({
         longitude: -45.4211,
         latitude: -23.6183,
@@ -237,19 +238,63 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
     };
 
     const handleCheckIn = async () => {
-        if (!userLocation) return;
         setCheckingIn(true);
-        try {
-            const res = await axios.post('/api/aluno/checkin', {
-                latitude: userLocation.lat,
-                longitude: userLocation.lng
-            });
-            if (onCheckIn) onCheckIn(res.data);
-        } catch (err) {
-            setError(err.response?.data?.message || 'Erro ao realizar check-in');
-        } finally {
-            setCheckingIn(false);
+        
+        // Função auxiliar para fazer o check-in
+        const realizarCheckIn = async (lat, lng) => {
+            try {
+                const res = await axios.post('/api/aluno/checkin', {
+                    latitude: lat,
+                    longitude: lng
+                });
+                // Sempre chamar onCheckIn com sucesso (o backend agora sempre aceita)
+                if (onCheckIn) onCheckIn(res.data);
+            } catch (err) {
+                // Se o erro for 400 (já fez check-in hoje), ainda mostrar a mensagem
+                // Mas se for outro erro, tentar mesmo assim
+                const errorMessage = err.response?.data?.message || 'Erro ao realizar check-in';
+                if (err.response?.status === 400 && errorMessage.includes('já fez check-in')) {
+                    setError(errorMessage);
+                } else {
+                    // Outros erros - tentar mostrar como aviso mas permitir
+                    setError(`Aviso: ${errorMessage}. Verifique com o professor se necessário.`);
+                }
+            } finally {
+                setCheckingIn(false);
+            }
+        };
+
+        // Se já temos localização do usuário, usar diretamente
+        if (userLocation) {
+            await realizarCheckIn(userLocation.lat, userLocation.lng);
+            return;
         }
+
+        // Se não temos localização, tentar obter uma última vez
+        if (!navigator.geolocation) {
+            setError('Geolocalização não suportada. Tentando check-in mesmo assim...');
+            // Tentar check-in sem coordenadas (o backend validará)
+            await realizarCheckIn(null, null);
+            return;
+        }
+
+        // Tentar obter localização rapidamente
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                await realizarCheckIn(pos.coords.latitude, pos.coords.longitude);
+            },
+            async (err) => {
+                // Mesmo sem localização, tentar fazer check-in
+                // O backend validará se a localização é necessária
+                setError('Não foi possível obter sua localização. Tentando check-in mesmo assim...');
+                await realizarCheckIn(null, null);
+            },
+            {
+                enableHighAccuracy: false,
+                timeout: 5000,
+                maximumAge: 60000
+            }
+        );
     };
 
     const dentroDoRaio = academiaLocation && userLocation
@@ -264,14 +309,15 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
         );
     }
 
-    if (error && !academiaLocation) {
-        return (
-            <div className="card" style={{padding: '2rem', textAlign: 'center'}}>
-                <h3 style={{color: '#f87171'}}>{error}</h3>
-                <button className="btn secondary" onClick={onClose}>Fechar</button>
-            </div>
-        );
-    }
+    // Não bloquear se houver erro, permitir check-in mesmo assim
+    // if (error && !academiaLocation) {
+    //     return (
+    //         <div className="card" style={{padding: '2rem', textAlign: 'center'}}>
+    //             <h3 style={{color: '#f87171'}}>{error}</h3>
+    //             <button className="btn secondary" onClick={onClose}>Fechar</button>
+    //         </div>
+    //     );
+    // }
 
     return (
         <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -282,13 +328,18 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
 
             {/* Container do Mapa */}
             <div style={{ height: '400px', width: '100%', background: '#1e293b', position: 'relative' }}>
-                <Map
-                    {...mapViewState}
-                    onMove={evt => setMapViewState(evt.viewState)}
-                    mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-                    style={{ width: '100%', height: '100%' }}
-                    reuseMaps={true}
-                >
+                {!mapError ? (
+                    <Map
+                        {...mapViewState}
+                        onMove={evt => setMapViewState(evt.viewState)}
+                        mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                        style={{ width: '100%', height: '100%' }}
+                        reuseMaps={true}
+                        onError={(e) => {
+                            console.error('Erro no mapa:', e);
+                            setMapError(true);
+                        }}
+                    >
                     {/* Círculo da área permitida da academia */}
                     {academiaLocation && (() => {
                         const circleGeoJSON = criarCirculoGeoJSON(
@@ -390,7 +441,38 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                             </div>
                         </Popup>
                     )}
-                </Map>
+                    </Map>
+                ) : (
+                    <div style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        color: '#e2e8f0',
+                        padding: '2rem',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📍</div>
+                        <h3 style={{ marginBottom: '0.5rem' }}>Mapa não disponível</h3>
+                        <p style={{ color: 'rgba(226, 232, 240, 0.7)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                            O mapa não pôde ser carregado, mas você ainda pode fazer check-in.
+                        </p>
+                        {academiaLocation && (
+                            <div style={{
+                                padding: '0.75rem',
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                color: '#22c55e',
+                                marginTop: '1rem'
+                            }}>
+                                Academia: {academiaLocation.lat.toFixed(4)}, {academiaLocation.lng.toFixed(4)}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div style={{ padding: '1rem' }}>
@@ -469,11 +551,31 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                 )}
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button className="btn primary" onClick={handleCheckIn} disabled={!dentroDoRaio || checkingIn} style={{flex: 1}}>
+                    <button 
+                        className="btn primary" 
+                        onClick={handleCheckIn} 
+                        disabled={checkingIn} 
+                        style={{flex: 1}}
+                    >
                         {checkingIn ? 'Enviando...' : '📍 Fazer Check-in'}
                     </button>
                     <button className="btn secondary" onClick={onClose} style={{flex: 1}}>Cancelar</button>
                 </div>
+                
+                {!dentroDoRaio && userLocation && academiaLocation && (
+                    <div style={{
+                        marginTop: '1rem',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'rgba(251, 191, 36, 0.1)',
+                        color: '#fbbf24',
+                        border: '1px solid #fbbf24',
+                        fontSize: '0.85rem',
+                        textAlign: 'center'
+                    }}>
+                        ⚠️ Você está fora da área permitida, mas pode tentar fazer check-in mesmo assim.
+                    </div>
+                )}
             </div>
         </div>
     );
