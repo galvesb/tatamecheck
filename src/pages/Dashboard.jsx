@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import PresencaPage from './modules/PresencaPage';
@@ -17,6 +17,9 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const [activeModule, setActiveModule] = useState('presenca');
     const [hamburgerMenuVisible, setHamburgerMenuVisible] = useState(false);
+    const [financeiroTab, setFinanceiroTab] = useState('overview');
+    const [showCreateMenu, setShowCreateMenu] = useState(false);
+    const financeiroCreateRef = useRef(null);
 
     // Se ainda está carregando a autenticação, mostrar loading
     if (authLoading) {
@@ -41,8 +44,17 @@ const Dashboard = () => {
     useEffect(() => {
         if (user?.role === 'admin' && activeModule === 'presenca') {
             setActiveModule('pendencias');
+        } else if (user?.role === 'professor' && activeModule === 'presenca') {
+            setActiveModule('presenca');
         }
     }, [user]);
+
+    // Resetar tab financeiro quando sair do módulo financeiro
+    useEffect(() => {
+        if (activeModule !== 'financeiro') {
+            setFinanceiroTab('overview');
+        }
+    }, [activeModule]);
 
     const getMainModules = () => {
         // Módulos para alunos
@@ -54,21 +66,21 @@ const Dashboard = () => {
             ];
         }
 
-        // Para admin: apenas Pendências, Financeiro e Mídia na barra principal
+        // Para admin: Pendências, Alunos e Mídia na barra principal
         if (user?.role === 'admin') {
             return [
                 { id: 'pendencias', name: 'Pendências', icon: '⏳', color: '#ef4444' },
-                { id: 'financeiro', name: 'Financeiro', icon: '💰', color: '#58cc02' },
+                { id: 'alunos', name: 'Alunos', icon: '👥', color: '#f59e0b' },
                 { id: 'midia', name: 'Mídia', icon: '📱', color: '#8b5cf6' }
             ];
         }
 
-        // Para professores: Presença, Pendências, Financeiro e Mídia
+        // Para professores: Presença, Pendências, Alunos e Mídia
         if (user?.role === 'professor') {
             return [
                 { id: 'presenca', name: 'Presença', icon: '📍', color: '#1cb0f6' },
                 { id: 'pendencias', name: 'Pendências', icon: '⏳', color: '#ef4444' },
-                { id: 'financeiro', name: 'Financeiro', icon: '💰', color: '#58cc02' },
+                { id: 'alunos', name: 'Alunos', icon: '👥', color: '#f59e0b' },
                 { id: 'midia', name: 'Mídia', icon: '📱', color: '#8b5cf6' }
             ];
         }
@@ -85,9 +97,9 @@ const Dashboard = () => {
             extraModules.push({ id: 'historicoGraduacoes', name: 'Histórico de Graduações', icon: '🎯', color: '#58cc02' });
         }
         
-        // Adicionar módulo de gerenciamento para professores e admins
+        // Adicionar módulo de financeiro para professores e admins no menu hambúrguer
         if (user?.role === 'professor' || user?.role === 'admin') {
-            extraModules.push({ id: 'alunos', name: 'Alunos', icon: '👥', color: '#f59e0b' });
+            extraModules.push({ id: 'financeiro', name: 'Financeiro', icon: '💰', color: '#58cc02' });
         }
 
         // Adicionar módulo de configurações apenas para admins
@@ -104,6 +116,15 @@ const Dashboard = () => {
     const extraModules = getExtraModules();
     const allModules = [...mainModules, ...extraModules];
 
+    const getFinanceiroTabs = () => {
+        return [
+            { id: 'overview', name: 'Resumo', icon: '📊' },
+            { id: 'despesas', name: 'Despesas', icon: '💸' },
+            { id: 'receitas', name: 'Receitas', icon: '💰' },
+            { id: 'pagamentos', name: 'A Receber', icon: '📋' }
+        ];
+    };
+
     const renderModule = () => {
         switch (activeModule) {
             case 'presenca':
@@ -111,7 +132,7 @@ const Dashboard = () => {
             case 'pendencias':
                 return <PendenciasPage />;
             case 'financeiro':
-                return <FinanceiroPage />;
+                return <FinanceiroPage activeTab={financeiroTab} onTabChange={setFinanceiroTab} onCreateClick={financeiroCreateRef} />;
             case 'progresso':
                 return <ProgressoPage />;
             case 'midia':
@@ -136,8 +157,17 @@ const Dashboard = () => {
                 </div>
                 <div className="app-header-center">
                     <div className="app-title">
-                        <span>{allModules.find(m => m.id === activeModule)?.icon}</span>
-                        <span>{allModules.find(m => m.id === activeModule)?.name || 'TatameCheck'}</span>
+                        {activeModule === 'financeiro' ? (
+                            <>
+                                <span>{getFinanceiroTabs().find(t => t.id === financeiroTab)?.icon || '💰'}</span>
+                                <span>{getFinanceiroTabs().find(t => t.id === financeiroTab)?.name || 'Financeiro'}</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>{allModules.find(m => m.id === activeModule)?.icon}</span>
+                                <span>{allModules.find(m => m.id === activeModule)?.name || 'TatameCheck'}</span>
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="app-header-right">
@@ -177,18 +207,145 @@ const Dashboard = () => {
             </div>
 
             <footer className="app-tab-bar">
-                {mainModules.map(module => (
-                    <button
-                        key={module.id}
-                        type="button"
-                        className={activeModule === module.id ? 'active' : ''}
-                        onClick={() => setActiveModule(module.id)}
-                    >
-                        <span>{module.icon}</span>
-                        <small>{module.name}</small>
-                    </button>
-                ))}
+                {activeModule === 'financeiro' ? (
+                    <>
+                        {getFinanceiroTabs().map((tab, index) => (
+                            <React.Fragment key={tab.id}>
+                                <button
+                                    type="button"
+                                    className={financeiroTab === tab.id ? 'active' : ''}
+                                    onClick={() => setFinanceiroTab(tab.id)}
+                                >
+                                    <span>{tab.icon}</span>
+                                    <small>{tab.name}</small>
+                                </button>
+                                {index === 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCreateMenu(true)}
+                                    >
+                                        <span>+</span>
+                                        <small>Novo</small>
+                                    </button>
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </>
+                ) : (
+                    mainModules.map(module => (
+                        <button
+                            key={module.id}
+                            type="button"
+                            className={activeModule === module.id ? 'active' : ''}
+                            onClick={() => setActiveModule(module.id)}
+                        >
+                            <span>{module.icon}</span>
+                            <small>{module.name}</small>
+                        </button>
+                    ))
+                )}
             </footer>
+
+            {/* Menu de Criação Financeiro */}
+            {showCreateMenu && activeModule === 'financeiro' && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        bottom: '80px',
+                        right: '16px',
+                        zIndex: 300,
+                        background: 'rgba(30, 41, 59, 0.98)',
+                        borderRadius: '16px',
+                        padding: '1rem',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        minWidth: '200px'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)', fontWeight: 600 }}>
+                        Novo Cadastro
+                    </div>
+                    <button
+                        className="btn secondary"
+                        style={{
+                            width: '100%',
+                            marginBottom: '0.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            justifyContent: 'flex-start',
+                            padding: '12px 16px'
+                        }}
+                        onClick={() => {
+                            if (financeiroCreateRef.current) {
+                                financeiroCreateRef.current('despesa');
+                            }
+                            setShowCreateMenu(false);
+                        }}
+                    >
+                        <span>💸</span>
+                        <span>Nova Despesa</span>
+                    </button>
+                    <button
+                        className="btn secondary"
+                        style={{
+                            width: '100%',
+                            marginBottom: '0.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            justifyContent: 'flex-start',
+                            padding: '12px 16px'
+                        }}
+                        onClick={() => {
+                            if (financeiroCreateRef.current) {
+                                financeiroCreateRef.current('receita');
+                            }
+                            setShowCreateMenu(false);
+                        }}
+                    >
+                        <span>💰</span>
+                        <span>Nova Receita</span>
+                    </button>
+                    <button
+                        className="btn secondary"
+                        style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            justifyContent: 'flex-start',
+                            padding: '12px 16px'
+                        }}
+                        onClick={() => {
+                            if (financeiroCreateRef.current) {
+                                financeiroCreateRef.current('pagamento');
+                            }
+                            setShowCreateMenu(false);
+                        }}
+                    >
+                        <span>📋</span>
+                        <span>Novo Pagamento</span>
+                    </button>
+                </div>
+            )}
+
+            {/* Overlay para fechar o menu */}
+            {showCreateMenu && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        zIndex: 299,
+                        background: 'transparent'
+                    }}
+                    onClick={() => setShowCreateMenu(false)}
+                />
+            )}
 
             {/* Hamburger Menu */}
             {hamburgerMenuVisible && extraModules.length > 0 && (
