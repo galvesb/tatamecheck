@@ -222,14 +222,18 @@ router.get('/progresso', async (req, res) => {
                         const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
                         const diasNecessarios = converterMesesParaDias(mesesNecessarios);
                         const diasFaltantes = Math.max(0, diasNecessarios - diasPresenca);
+                        const completo = diasPresenca >= diasNecessarios;
                         tempoRestanteProximaFaixa = {
                             dias: diasFaltantes,
                             diasNecessarios,
                             diasPresenca,
-                            completo: diasPresenca >= diasNecessarios,
+                            completo: completo,
                             nomeFaixa: proximaFaixa.nome,
                             mesesNecessarios // Manter para referência
                         };
+
+                        // Não mostrar próximo objetivo até o professor confirmar a graduação
+                        // Quando está elegível, apenas mostra que está elegível
                     }
                 } else {
                     // Verificar se há próximo grau na faixa atual
@@ -242,13 +246,17 @@ router.get('/progresso', async (req, res) => {
                         // Converter meses necessários para dias
                         const diasNecessarios = converterMesesParaDias(grauConfig.tempoMinimoMeses);
                         const diasFaltantes = Math.max(0, diasNecessarios - diasPresenca);
+                        const completo = diasPresenca >= diasNecessarios;
                         tempoRestanteProximoGrau = {
                             dias: diasFaltantes,
                             diasNecessarios,
                             diasPresenca,
-                            completo: diasPresenca >= diasNecessarios,
+                            completo: completo,
                             mesesNecessarios: grauConfig.tempoMinimoMeses // Manter para referência
                         };
+
+                        // Não mostrar próximo objetivo até o professor confirmar a graduação
+                        // Quando está elegível, apenas mostra que está elegível
                     }
                 }
             }

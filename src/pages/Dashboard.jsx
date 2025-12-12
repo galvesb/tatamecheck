@@ -6,6 +6,7 @@ import FinanceiroPage from './modules/FinanceiroPage';
 import ProgressoPage from './modules/ProgressoPage';
 import MidiaPage from './modules/MidiaPage';
 import ConfiguracoesPage from './modules/ConfiguracoesPage';
+import PendenciasPage from './modules/PendenciasPage';
 import GerenciarAlunos from './GerenciarAlunos';
 import '../index.css';
 
@@ -47,6 +48,7 @@ const Dashboard = () => {
         // Módulos para professores e admins
         const baseModules = [
             { id: 'presenca', name: 'Presença', icon: '📍', color: '#1cb0f6' },
+            { id: 'pendencias', name: 'Pendências', icon: '⏳', color: '#ef4444' },
             { id: 'financeiro', name: 'Financeiro', icon: '💰', color: '#58cc02' },
             { id: 'midia', name: 'Mídia', icon: '📱', color: '#8b5cf6' }
         ];
@@ -70,6 +72,8 @@ const Dashboard = () => {
         switch (activeModule) {
             case 'presenca':
                 return <PresencaPage />;
+            case 'pendencias':
+                return <PendenciasPage />;
             case 'financeiro':
                 return <FinanceiroPage />;
             case 'progresso':

@@ -530,5 +530,204 @@ router.post('/alunos/:id/graduacao', async (req, res) => {
     }
 });
 
+// ====== ROTAS DE PENDÊNCIAS ======
+
+// Listar pendências (alunos elegíveis para graduação e presenças não validadas)
+router.get('/pendencias', async (req, res) => {
+    try {
+        const academia = await Academia.findOne();
+        if (!academia) {
+            return res.status(404).json({ message: 'Academia não configurada' });
+        }
+
+        // Buscar todos os alunos
+        const alunos = await Aluno.find().populate('userId', 'name email');
+        
+        // Converter meses para dias
+        const converterMesesParaDias = (meses) => meses * 30;
+
+        const pendenciasGraduacao = [];
+        const presencasPendentes = [];
+
+        // Verificar alunos elegíveis para graduação
+        for (const aluno of alunos) {
+            const diasPresenca = aluno.diasPresencaDesdeUltimaGraduacao || 0;
+            const faixaAtualConfig = academia.configuracoes?.faixas?.find(f => f.nome === aluno.faixaAtual);
+            
+            if (faixaAtualConfig) {
+                const ultimoGrauConfig = faixaAtualConfig.graus[faixaAtualConfig.graus.length - 1];
+                const estaNoUltimoGrau = ultimoGrauConfig && aluno.grauAtual >= ultimoGrauConfig.numero;
+
+                if (estaNoUltimoGrau) {
+                    // Aluno está no último grau da faixa, verificar se está elegível para próxima faixa
+                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
+                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
+                        const proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
+                        const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
+                        const diasNecessarios = converterMesesParaDias(mesesNecessarios);
+                        
+                        if (diasPresenca >= diasNecessarios) {
+                            pendenciasGraduacao.push({
+                                alunoId: aluno._id,
+                                alunoNome: aluno.userId.name,
+                                alunoEmail: aluno.userId.email,
+                                tipo: 'faixa',
+                                faixaAtual: aluno.faixaAtual,
+                                grauAtual: aluno.grauAtual,
+                                proximaFaixa: proximaFaixa.nome,
+                                proximoGrau: 0,
+                                diasPresenca,
+                                diasNecessarios,
+                                elegivel: true
+                            });
+                        }
+                    }
+                } else {
+                    // Verificar se está elegível para próximo grau
+                    const proximoGrauNum = aluno.grauAtual + 1;
+                    const grauConfig = faixaAtualConfig.graus.find(g => g.numero === proximoGrauNum);
+                    
+                    if (grauConfig) {
+                        const diasNecessarios = converterMesesParaDias(grauConfig.tempoMinimoMeses);
+                        
+                        if (diasPresenca >= diasNecessarios) {
+                            pendenciasGraduacao.push({
+                                alunoId: aluno._id,
+                                alunoNome: aluno.userId.name,
+                                alunoEmail: aluno.userId.email,
+                                tipo: 'grau',
+                                faixaAtual: aluno.faixaAtual,
+                                grauAtual: aluno.grauAtual,
+                                proximaFaixa: aluno.faixaAtual,
+                                proximoGrau: proximoGrauNum,
+                                diasPresenca,
+                                diasNecessarios,
+                                elegivel: true
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Buscar presenças não validadas
+        const presencas = await Presenca.find({ validada: false })
+            .sort({ data: -1 })
+            .limit(50);
+
+        for (const presenca of presencas) {
+            const aluno = await Aluno.findById(presenca.alunoId).populate('userId', 'name email');
+            if (aluno && aluno.userId) {
+                presencasPendentes.push({
+                    id: presenca._id,
+                    alunoId: aluno._id,
+                    alunoNome: aluno.userId.name,
+                    alunoEmail: aluno.userId.email,
+                    data: presenca.data,
+                    localizacao: presenca.localizacao
+                });
+            }
+        }
+
+        res.json({
+            graduacoes: pendenciasGraduacao,
+            presencas: presencasPendentes,
+            total: pendenciasGraduacao.length + presencasPendentes.length
+        });
+    } catch (err) {
+        console.error('Erro ao buscar pendências:', err);
+        res.status(500).json({ message: 'Erro ao buscar pendências', error: err.message });
+    }
+});
+
+// Confirmar graduação de um aluno elegível
+router.post('/pendencias/:alunoId/confirmar-graduacao', async (req, res) => {
+    try {
+        const { faixa, grau, observacoes } = req.body;
+        const alunoId = req.params.alunoId;
+
+        if (!faixa || grau === undefined) {
+            return res.status(400).json({ message: 'Faixa e grau são obrigatórios' });
+        }
+
+        const aluno = await Aluno.findById(alunoId).populate('academiaId');
+        if (!aluno) {
+            return res.status(404).json({ message: 'Aluno não encontrado' });
+        }
+
+        // Criar registro de graduação
+        const graduacao = new Graduacao({
+            alunoId: aluno._id,
+            faixa,
+            grau: parseInt(grau),
+            data: new Date(),
+            diasPresencaAteGraduacao: aluno.diasPresencaDesdeUltimaGraduacao,
+            avaliadoPor: req.user.userId,
+            observacoes: observacoes || ''
+        });
+
+        await graduacao.save();
+
+        // Atualizar perfil do aluno
+        aluno.faixaAtual = faixa;
+        aluno.grauAtual = parseInt(grau);
+        aluno.diasPresencaDesdeUltimaGraduacao = 0; // Resetar contador
+        aluno.dataUltimaGraduacao = new Date();
+        aluno.ultimaGraduacao = {
+            data: new Date(),
+            faixa,
+            grau: parseInt(grau)
+        };
+
+        await aluno.save();
+
+        res.json({
+            message: 'Graduação confirmada com sucesso',
+            graduacao: {
+                id: graduacao._id,
+                faixa: graduacao.faixa,
+                grau: graduacao.grau,
+                data: graduacao.data
+            },
+            aluno: {
+                faixaAtual: aluno.faixaAtual,
+                grauAtual: aluno.grauAtual,
+                diasPresenca: aluno.diasPresencaDesdeUltimaGraduacao
+            }
+        });
+    } catch (err) {
+        console.error('Erro ao confirmar graduação:', err);
+        res.status(500).json({ message: 'Erro ao confirmar graduação', error: err.message });
+    }
+});
+
+// Validar uma presença pendente
+router.post('/pendencias/presencas/:id/validar', async (req, res) => {
+    try {
+        const presencaId = req.params.id;
+
+        const presenca = await Presenca.findById(presencaId);
+        if (!presenca) {
+            return res.status(404).json({ message: 'Presença não encontrada' });
+        }
+
+        presenca.validada = true;
+        presenca.validadaPor = req.user.userId;
+        await presenca.save();
+
+        res.json({
+            message: 'Presença validada com sucesso',
+            presenca: {
+                id: presenca._id,
+                data: presenca.data,
+                validada: presenca.validada
+            }
+        });
+    } catch (err) {
+        console.error('Erro ao validar presença:', err);
+        res.status(500).json({ message: 'Erro ao validar presença', error: err.message });
+    }
+});
+
 module.exports = router;
 
