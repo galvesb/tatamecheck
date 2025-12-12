@@ -82,9 +82,9 @@ const ProgressoPage = () => {
     }
 
     return (
-        <div>
+        <div style={{ width: '100%' }}>
             {/* Progresso do Aluno */}
-            <div className="card" style={{ marginBottom: '16px' }}>
+            <div className="card" style={{ marginBottom: '16px', width: '100%', boxSizing: 'border-box' }}>
                 <h2>Meu Progresso</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="stats-card">
@@ -125,7 +125,9 @@ const ProgressoPage = () => {
                         border: `1px solid ${progresso.tempoRestanteProximoGrau.completo 
                             ? 'rgba(34, 197, 94, 0.3)' 
                             : 'rgba(59, 130, 246, 0.2)'}`,
-                        fontSize: '0.9rem'
+                        fontSize: '0.9rem',
+                        width: '100%',
+                        boxSizing: 'border-box'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <strong>
@@ -200,7 +202,9 @@ const ProgressoPage = () => {
                         border: `1px solid ${progresso.tempoRestanteProximaFaixa.completo 
                             ? 'rgba(34, 197, 94, 0.3)' 
                             : 'rgba(59, 130, 246, 0.2)'}`,
-                        fontSize: '0.9rem'
+                        fontSize: '0.9rem',
+                        width: '100%',
+                        boxSizing: 'border-box'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <strong>
