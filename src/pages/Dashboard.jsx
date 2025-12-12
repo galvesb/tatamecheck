@@ -120,6 +120,7 @@ const Dashboard = () => {
         return [
             { id: 'overview', name: 'Resumo', icon: '📊' },
             { id: 'despesas', name: 'Despesas', icon: '💸' },
+            { id: 'cadastro', name: 'Novo', icon: '+' },
             { id: 'receitas', name: 'Receitas', icon: '💰' },
             { id: 'pagamentos', name: 'A Receber', icon: '📋' }
         ];
@@ -209,26 +210,22 @@ const Dashboard = () => {
             <footer className="app-tab-bar">
                 {activeModule === 'financeiro' ? (
                     <>
-                        {getFinanceiroTabs().map((tab, index) => (
-                            <React.Fragment key={tab.id}>
-                                <button
-                                    type="button"
-                                    className={financeiroTab === tab.id ? 'active' : ''}
-                                    onClick={() => setFinanceiroTab(tab.id)}
-                                >
-                                    <span>{tab.icon}</span>
-                                    <small>{tab.name}</small>
-                                </button>
-                                {index === 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCreateMenu(true)}
-                                    >
-                                        <span>+</span>
-                                        <small>Novo</small>
-                                    </button>
-                                )}
-                            </React.Fragment>
+                        {getFinanceiroTabs().map(tab => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                className={financeiroTab === tab.id ? 'active' : ''}
+                                onClick={() => {
+                                    if (tab.id === 'cadastro') {
+                                        setShowCreateMenu(true);
+                                    } else {
+                                        setFinanceiroTab(tab.id);
+                                    }
+                                }}
+                            >
+                                <span>{tab.icon}</span>
+                                <small>{tab.name}</small>
+                            </button>
                         ))}
                     </>
                 ) : (
@@ -251,15 +248,17 @@ const Dashboard = () => {
                 <div
                     style={{
                         position: 'fixed',
-                        bottom: '80px',
-                        right: '16px',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
                         zIndex: 300,
                         background: 'rgba(30, 41, 59, 0.98)',
                         borderRadius: '16px',
-                        padding: '1rem',
+                        padding: '1.5rem',
                         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
-                        minWidth: '200px'
+                        minWidth: '250px',
+                        maxWidth: '90%'
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -278,10 +277,13 @@ const Dashboard = () => {
                             padding: '12px 16px'
                         }}
                         onClick={() => {
-                            if (financeiroCreateRef.current) {
-                                financeiroCreateRef.current('despesa');
-                            }
+                            setFinanceiroTab('cadastro');
                             setShowCreateMenu(false);
+                            setTimeout(() => {
+                                if (financeiroCreateRef.current) {
+                                    financeiroCreateRef.current('despesa');
+                                }
+                            }, 100);
                         }}
                     >
                         <span>💸</span>
@@ -299,10 +301,13 @@ const Dashboard = () => {
                             padding: '12px 16px'
                         }}
                         onClick={() => {
-                            if (financeiroCreateRef.current) {
-                                financeiroCreateRef.current('receita');
-                            }
+                            setFinanceiroTab('cadastro');
                             setShowCreateMenu(false);
+                            setTimeout(() => {
+                                if (financeiroCreateRef.current) {
+                                    financeiroCreateRef.current('receita');
+                                }
+                            }, 100);
                         }}
                     >
                         <span>💰</span>
@@ -319,10 +324,13 @@ const Dashboard = () => {
                             padding: '12px 16px'
                         }}
                         onClick={() => {
-                            if (financeiroCreateRef.current) {
-                                financeiroCreateRef.current('pagamento');
-                            }
+                            setFinanceiroTab('cadastro');
                             setShowCreateMenu(false);
+                            setTimeout(() => {
+                                if (financeiroCreateRef.current) {
+                                    financeiroCreateRef.current('pagamento');
+                                }
+                            }, 100);
                         }}
                     >
                         <span>📋</span>
@@ -341,7 +349,7 @@ const Dashboard = () => {
                         width: '100%',
                         height: '100%',
                         zIndex: 299,
-                        background: 'transparent'
+                        background: 'rgba(0, 0, 0, 0.5)'
                     }}
                     onClick={() => setShowCreateMenu(false)}
                 />

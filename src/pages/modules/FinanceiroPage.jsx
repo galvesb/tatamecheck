@@ -154,6 +154,13 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         setEditingItem(item);
         setShowForm(true);
         
+        // Mudar para a tab de cadastro quando abrir formulário
+        if (onTabChange) {
+            onTabChange('cadastro');
+        } else {
+            setActiveTab('cadastro');
+        }
+        
         if (item) {
             setFormData({
                 descricao: item.descricao || '',
@@ -296,6 +303,473 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             style: 'currency',
             currency: 'BRL'
         }).format(valor);
+    };
+
+    const renderFormulario = () => {
+        if (!showForm) return null;
+        
+        return (
+            <div className="card" style={{ marginBottom: '16px', padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+                        {editingItem ? `Editar ${formType === 'despesa' ? 'Despesa' : formType === 'receita' ? 'Receita' : 'Pagamento'}` : `Nova ${formType === 'despesa' ? 'Despesa' : formType === 'receita' ? 'Receita' : 'Pagamento'}`}
+                    </h2>
+                    <button
+                        onClick={fecharFormulario}
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            color: '#e2e8f0',
+                            fontSize: '1.25rem',
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '8px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(244, 63, 94, 0.2)';
+                            e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                    >
+                        ×
+                    </button>
+                </div>
+                {renderFormContent()}
+            </div>
+        );
+    };
+
+    const renderFormContent = () => {
+        return (
+            <form onSubmit={handleSubmit}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                            Descrição *
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.descricao || ''}
+                            onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                            required
+                            style={{
+                                width: '100%',
+                                padding: '0.875rem',
+                                borderRadius: '10px',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#fff',
+                                fontSize: '0.95rem'
+                            }}
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                            Valor *
+                        </label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.valor || ''}
+                            onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                            required
+                            style={{
+                                width: '100%',
+                                padding: '0.875rem',
+                                borderRadius: '10px',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#fff',
+                                fontSize: '0.95rem'
+                            }}
+                        />
+                    </div>
+
+                    {formType === 'despesa' && (
+                        <>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Categoria *
+                                </label>
+                                <select
+                                    value={formData.categoria || ''}
+                                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                >
+                                    <option value="">Selecione...</option>
+                                    <option value="fixa">Fixa</option>
+                                    <option value="pessoal">Pessoal</option>
+                                    <option value="material">Material</option>
+                                    <option value="manutencao">Manutenção</option>
+                                    <option value="marketing">Marketing</option>
+                                    <option value="outros">Outros</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.data || ''}
+                                        onChange={(e) => setFormData({ ...formData, data: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data Vencimento
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dataVencimento || ''}
+                                        onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.pago || false}
+                                    onChange={(e) => setFormData({ ...formData, pago: e.target.checked, dataPagamento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                />
+                                <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como pago</label>
+                            </div>
+                            {formData.pago && (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data Pagamento
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dataPagamento || ''}
+                                        onChange={(e) => setFormData({ ...formData, dataPagamento: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {formType === 'receita' && (
+                        <>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Categoria *
+                                </label>
+                                <select
+                                    value={formData.categoria || ''}
+                                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                >
+                                    <option value="">Selecione...</option>
+                                    <option value="mensalidade">Mensalidade</option>
+                                    <option value="matricula">Matrícula</option>
+                                    <option value="evento">Evento</option>
+                                    <option value="produto">Produto</option>
+                                    <option value="outros">Outros</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Aluno (opcional)
+                                </label>
+                                <select
+                                    value={formData.alunoId || ''}
+                                    onChange={(e) => setFormData({ ...formData, alunoId: e.target.value })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                >
+                                    <option value="">Nenhum</option>
+                                    {alunos.map(aluno => (
+                                        <option key={aluno.id} value={aluno.id}>{aluno.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.data || ''}
+                                        onChange={(e) => setFormData({ ...formData, data: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data Recebimento
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dataRecebimento || ''}
+                                        onChange={(e) => setFormData({ ...formData, dataRecebimento: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.recebido || false}
+                                    onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                />
+                                <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
+                            </div>
+                        </>
+                    )}
+
+                    {formType === 'pagamento' && (
+                        <>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Aluno *
+                                </label>
+                                <select
+                                    value={formData.alunoId || ''}
+                                    onChange={(e) => setFormData({ ...formData, alunoId: e.target.value })}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                >
+                                    <option value="">Selecione...</option>
+                                    {alunos.map(aluno => (
+                                        <option key={aluno.id} value={aluno.id}>{aluno.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Data Vencimento *
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.dataVencimento || ''}
+                                    onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.recebido || false}
+                                    onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                />
+                                <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
+                            </div>
+                            {formData.recebido && (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data Recebimento
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dataRecebimento || ''}
+                                        onChange={(e) => setFormData({ ...formData, dataRecebimento: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* Campos comuns para recorrentes */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
+                        <input
+                            type="checkbox"
+                            checked={formData.recorrente || false}
+                            onChange={(e) => setFormData({ ...formData, recorrente: e.target.checked })}
+                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                        />
+                        <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Recorrente</label>
+                    </div>
+
+                    {formData.recorrente && (
+                        <>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Frequência
+                                </label>
+                                <select
+                                    value={formData.frequenciaRecorrencia || 'mensal'}
+                                    onChange={(e) => setFormData({ ...formData, frequenciaRecorrencia: e.target.value })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                >
+                                    <option value="mensal">Mensal</option>
+                                    <option value="trimestral">Trimestral</option>
+                                    <option value="semestral">Semestral</option>
+                                    <option value="anual">Anual</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                    Próxima Ocorrência
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.proximaOcorrencia || ''}
+                                    onChange={(e) => setFormData({ ...formData, proximaOcorrencia: e.target.value })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        color: '#fff',
+                                        fontSize: '0.95rem'
+                                    }}
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                            Observações
+                        </label>
+                        <textarea
+                            value={formData.observacoes || ''}
+                            onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                            rows="3"
+                            style={{
+                                width: '100%',
+                                padding: '0.875rem',
+                                borderRadius: '10px',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#fff',
+                                resize: 'vertical',
+                                fontSize: '0.95rem'
+                            }}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                    <button type="submit" className="btn primary" style={{ flex: 1, padding: '0.875rem', borderRadius: '10px', fontWeight: 600 }}>
+                        {editingItem ? '💾 Salvar' : '✅ Criar'}
+                    </button>
+                    <button type="button" className="btn secondary" style={{ flex: 1, padding: '0.875rem', borderRadius: '10px', fontWeight: 600 }} onClick={fecharFormulario}>
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        );
     };
 
     if (user?.role !== 'admin' && user?.role !== 'professor') {
@@ -642,6 +1116,23 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                             </div>
                         </>
                     ) : null}
+                </div>
+            )}
+
+            {/* Cadastro - Tela Dedicada para Formulários */}
+            {activeTab === 'cadastro' && (
+                <div>
+                    {showForm ? (
+                        renderFormulario()
+                    ) : (
+                        <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
+                            <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>➕</div>
+                            <h2 style={{ marginBottom: '1rem', color: '#e2e8f0' }}>Novo Cadastro</h2>
+                            <p style={{ color: 'rgba(226, 232, 240, 0.7)', marginBottom: '2rem' }}>
+                                Clique no botão "+" no menu inferior para criar uma nova despesa, receita ou pagamento.
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1349,487 +1840,6 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                 })}
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {/* Formulário Modal - Estilo Organizze */}
-            {showForm && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(0, 0, 0, 0.75)',
-                        zIndex: 1000,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '1rem'
-                    }}
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) {
-                            fecharFormulario();
-                        }
-                    }}
-                >
-                    <div
-                        className="card"
-                        style={{
-                            maxWidth: '600px',
-                            width: '100%',
-                            maxHeight: '90vh',
-                            overflowY: 'auto',
-                            padding: '2rem'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 600 }}>
-                                {editingItem ? `Editar ${formType === 'despesa' ? 'Despesa' : formType === 'receita' ? 'Receita' : 'Pagamento'}` : `Nova ${formType === 'despesa' ? 'Despesa' : formType === 'receita' ? 'Receita' : 'Pagamento'}`}
-                            </h2>
-                            <button
-                                onClick={fecharFormulario}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#e2e8f0',
-                                    fontSize: '1.5rem',
-                                    cursor: 'pointer',
-                                    padding: '4px 8px',
-                                    borderRadius: '50%',
-                                    width: '32px',
-                                    height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                        Descrição *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.descricao || ''}
-                                        onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                                        required
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem',
-                                            borderRadius: '10px',
-                                            background: 'rgba(255, 255, 255, 0.08)',
-                                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                                            color: '#fff',
-                                            fontSize: '0.95rem'
-                                        }}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                        Valor *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={formData.valor || ''}
-                                        onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
-                                        required
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem',
-                                            borderRadius: '10px',
-                                            background: 'rgba(255, 255, 255, 0.08)',
-                                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                                            color: '#fff',
-                                            fontSize: '0.95rem'
-                                        }}
-                                    />
-                                </div>
-
-                                {formType === 'despesa' && (
-                                    <>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Categoria *
-                                            </label>
-                                            <select
-                                                value={formData.categoria || ''}
-                                                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                                                required
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            >
-                                                <option value="">Selecione...</option>
-                                                <option value="fixa">Fixa</option>
-                                                <option value="pessoal">Pessoal</option>
-                                                <option value="material">Material</option>
-                                                <option value="manutencao">Manutenção</option>
-                                                <option value="marketing">Marketing</option>
-                                                <option value="outros">Outros</option>
-                                            </select>
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                            <div>
-                                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                    Data
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.data || ''}
-                                                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.875rem',
-                                                        borderRadius: '10px',
-                                                        background: 'rgba(255, 255, 255, 0.08)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                        color: '#fff',
-                                                        fontSize: '0.95rem'
-                                                    }}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                    Data Vencimento
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.dataVencimento || ''}
-                                                    onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.875rem',
-                                                        borderRadius: '10px',
-                                                        background: 'rgba(255, 255, 255, 0.08)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                        color: '#fff',
-                                                        fontSize: '0.95rem'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.pago || false}
-                                                onChange={(e) => setFormData({ ...formData, pago: e.target.checked, dataPagamento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
-                                                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                                            />
-                                            <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como pago</label>
-                                        </div>
-                                        {formData.pago && (
-                                            <div>
-                                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                    Data Pagamento
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.dataPagamento || ''}
-                                                    onChange={(e) => setFormData({ ...formData, dataPagamento: e.target.value })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.875rem',
-                                                        borderRadius: '10px',
-                                                        background: 'rgba(255, 255, 255, 0.08)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                        color: '#fff',
-                                                        fontSize: '0.95rem'
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                                {formType === 'receita' && (
-                                    <>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Categoria *
-                                            </label>
-                                            <select
-                                                value={formData.categoria || ''}
-                                                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                                                required
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            >
-                                                <option value="">Selecione...</option>
-                                                <option value="mensalidade">Mensalidade</option>
-                                                <option value="matricula">Matrícula</option>
-                                                <option value="evento">Evento</option>
-                                                <option value="produto">Produto</option>
-                                                <option value="outros">Outros</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Aluno (opcional)
-                                            </label>
-                                            <select
-                                                value={formData.alunoId || ''}
-                                                onChange={(e) => setFormData({ ...formData, alunoId: e.target.value })}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            >
-                                                <option value="">Nenhum</option>
-                                                {alunos.map(aluno => (
-                                                    <option key={aluno.id} value={aluno.id}>{aluno.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                            <div>
-                                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                    Data
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.data || ''}
-                                                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.875rem',
-                                                        borderRadius: '10px',
-                                                        background: 'rgba(255, 255, 255, 0.08)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                        color: '#fff',
-                                                        fontSize: '0.95rem'
-                                                    }}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                    Data Recebimento
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.dataRecebimento || ''}
-                                                    onChange={(e) => setFormData({ ...formData, dataRecebimento: e.target.value })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.875rem',
-                                                        borderRadius: '10px',
-                                                        background: 'rgba(255, 255, 255, 0.08)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                        color: '#fff',
-                                                        fontSize: '0.95rem'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.recebido || false}
-                                                onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
-                                                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                                            />
-                                            <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
-                                        </div>
-                                    </>
-                                )}
-
-                                {formType === 'pagamento' && (
-                                    <>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Aluno *
-                                            </label>
-                                            <select
-                                                value={formData.alunoId || ''}
-                                                onChange={(e) => setFormData({ ...formData, alunoId: e.target.value })}
-                                                required
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            >
-                                                <option value="">Selecione...</option>
-                                                {alunos.map(aluno => (
-                                                    <option key={aluno.id} value={aluno.id}>{aluno.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Data Vencimento *
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={formData.dataVencimento || ''}
-                                                onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
-                                                required
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            />
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.recebido || false}
-                                                onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
-                                                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                                            />
-                                            <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
-                                        </div>
-                                        {formData.recebido && (
-                                            <div>
-                                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                    Data Recebimento
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.dataRecebimento || ''}
-                                                    onChange={(e) => setFormData({ ...formData, dataRecebimento: e.target.value })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.875rem',
-                                                        borderRadius: '10px',
-                                                        background: 'rgba(255, 255, 255, 0.08)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                        color: '#fff',
-                                                        fontSize: '0.95rem'
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                                {/* Campos comuns para recorrentes */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.recorrente || false}
-                                        onChange={(e) => setFormData({ ...formData, recorrente: e.target.checked })}
-                                        style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                                    />
-                                    <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Recorrente</label>
-                                </div>
-
-                                {formData.recorrente && (
-                                    <>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Frequência
-                                            </label>
-                                            <select
-                                                value={formData.frequenciaRecorrencia || 'mensal'}
-                                                onChange={(e) => setFormData({ ...formData, frequenciaRecorrencia: e.target.value })}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            >
-                                                <option value="mensal">Mensal</option>
-                                                <option value="trimestral">Trimestral</option>
-                                                <option value="semestral">Semestral</option>
-                                                <option value="anual">Anual</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                                Próxima Ocorrência
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={formData.proximaOcorrencia || ''}
-                                                onChange={(e) => setFormData({ ...formData, proximaOcorrencia: e.target.value })}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem',
-                                                    borderRadius: '10px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                        Observações
-                                    </label>
-                                    <textarea
-                                        value={formData.observacoes || ''}
-                                        onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                                        rows="3"
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem',
-                                            borderRadius: '10px',
-                                            background: 'rgba(255, 255, 255, 0.08)',
-                                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                                            color: '#fff',
-                                            resize: 'vertical',
-                                            fontSize: '0.95rem'
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                                <button type="submit" className="btn primary" style={{ flex: 1, padding: '0.875rem', borderRadius: '10px', fontWeight: 600 }}>
-                                    {editingItem ? '💾 Salvar' : '✅ Criar'}
-                                </button>
-                                <button type="button" className="btn secondary" style={{ flex: 1, padding: '0.875rem', borderRadius: '10px', fontWeight: 600 }} onClick={fecharFormulario}>
-                                    Cancelar
-                                </button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             )}
