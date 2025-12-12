@@ -6,8 +6,6 @@ import '../../index.css';
 const ProgressoPage = () => {
     const { user } = useAuth();
     const [progresso, setProgresso] = useState(null);
-    const [presencas, setPresencas] = useState([]);
-    const [graduacoes, setGraduacoes] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -24,26 +22,14 @@ const ProgressoPage = () => {
 
         try {
             setLoading(true);
-            const [progressoRes, presencasRes, graduacoesRes] = await Promise.all([
-                axios.get('/api/aluno/progresso').catch(err => {
-                    console.error('Erro ao carregar progresso:', err);
-                    if (err.response?.status === 404) {
-                        return { data: null };
-                    }
+            const progressoRes = await axios.get('/api/aluno/progresso').catch(err => {
+                console.error('Erro ao carregar progresso:', err);
+                if (err.response?.status === 404) {
                     return { data: null };
-                }),
-                axios.get('/api/aluno/presenca').catch(err => {
-                    console.error('Erro ao carregar presenças:', err);
-                    return { data: { presencas: [] } };
-                }),
-                axios.get('/api/aluno/graduacoes').catch(err => {
-                    console.error('Erro ao carregar graduações:', err);
-                    return { data: { graduacoes: [] } };
-                })
-            ]);
+                }
+                return { data: null };
+            });
             setProgresso(progressoRes.data);
-            setPresencas(presencasRes.data?.presencas || []);
-            setGraduacoes(graduacoesRes.data?.graduacoes || []);
         } catch (err) {
             console.error('Erro ao carregar dados:', err);
         } finally {
@@ -285,73 +271,6 @@ const ProgressoPage = () => {
                     </div>
                 )}
             </div>
-
-            {/* Histórico de Presenças */}
-            {presencas.length > 0 && (
-                <div className="card" style={{ marginBottom: '16px' }}>
-                    <h3>Histórico de Presenças</h3>
-                    <p style={{ color: 'rgba(226, 232, 240, 0.7)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                        Últimas {Math.min(30, presencas.length)} presenças registradas
-                    </p>
-                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        {presencas.slice(0, 30).map((presenca) => (
-                            <div key={presenca.id} className="list-item">
-                                <div className="list-item-icon">✅</div>
-                                <div className="list-item-content">
-                                    <div className="list-item-title">
-                                        {new Date(presenca.data).toLocaleDateString('pt-BR', {
-                                            day: '2-digit',
-                                            month: '2-digit',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </div>
-                                    <div className="list-item-subtitle">
-                                        {presenca.validada ? 'Validada' : 'Pendente'}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Histórico de Graduações */}
-            {graduacoes.length > 0 && (
-                <div className="card">
-                    <h3>Histórico de Graduações</h3>
-                    <p style={{ color: 'rgba(226, 232, 240, 0.7)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                        Todas as suas graduações conquistadas
-                    </p>
-                    {graduacoes.map((graduacao) => (
-                        <div key={graduacao.id} className="list-item">
-                            <div className="list-item-icon">🎯</div>
-                            <div className="list-item-content">
-                                <div className="list-item-title">
-                                    {graduacao.faixa} - {graduacao.grau}º Grau
-                                </div>
-                                <div className="list-item-subtitle">
-                                    {new Date(graduacao.data).toLocaleDateString('pt-BR', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric'
-                                    })}
-                                    {graduacao.avaliadoPor && ` • Avaliado por: ${graduacao.avaliadoPor}`}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {presencas.length === 0 && graduacoes.length === 0 && (
-                <div className="card">
-                    <p style={{ color: 'rgba(226, 232, 240, 0.7)', textAlign: 'center' }}>
-                        Ainda não há histórico de presenças ou graduações.
-                    </p>
-                </div>
-            )}
         </div>
     );
 };
