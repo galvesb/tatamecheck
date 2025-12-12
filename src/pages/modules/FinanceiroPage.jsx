@@ -785,45 +785,38 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
 
     return (
         <div>
-            {/* Header com Tabs - Estilo Organizze */}
-            <div className="card" style={{ marginBottom: '16px', padding: '1.5rem' }}>
-                <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: '1.75rem', fontWeight: 600 }}>
-                    Financeiro
-                </h2>
-                <p style={{ color: 'rgba(226, 232, 240, 0.6)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
-                    Controle suas receitas, despesas e pagamentos
-                </p>
+            {/* Mensagens de Erro e Sucesso */}
+            {error && (
+                <div style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(244, 63, 94, 0.1)',
+                    color: '#f87171',
+                    border: '1px solid rgba(244, 63, 94, 0.2)',
+                    marginBottom: '1rem',
+                    fontSize: '0.9rem'
+                }}>
+                    {error}
+                </div>
+            )}
 
-                {error && (
-                    <div style={{
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        background: 'rgba(244, 63, 94, 0.1)',
-                        color: '#f87171',
-                        border: '1px solid rgba(244, 63, 94, 0.2)',
-                        marginBottom: '1rem',
-                        fontSize: '0.9rem'
-                    }}>
-                        {error}
-                    </div>
-                )}
+            {success && (
+                <div style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    color: '#22c55e',
+                    border: '1px solid rgba(34, 197, 94, 0.2)',
+                    marginBottom: '1rem',
+                    fontSize: '0.9rem'
+                }}>
+                    {success}
+                </div>
+            )}
 
-                {success && (
-                    <div style={{
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        background: 'rgba(34, 197, 94, 0.1)',
-                        color: '#22c55e',
-                        border: '1px solid rgba(34, 197, 94, 0.2)',
-                        marginBottom: '1rem',
-                        fontSize: '0.9rem'
-                    }}>
-                        {success}
-                    </div>
-                )}
-
-                {/* Tabs - Estilo Organizze (apenas se não controlado externamente) */}
-                {externalActiveTab === undefined && (
+            {/* Tabs - Estilo Organizze (apenas se não controlado externamente) */}
+            {externalActiveTab === undefined && (
+                <div className="card" style={{ marginBottom: '16px', padding: '1.5rem' }}>
                 <div style={{
                     display: 'flex',
                     gap: '0',
@@ -909,8 +902,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         A Receber
                     </button>
                 </div>
+                </div>
                 )}
-            </div>
 
             {/* Resumo - Estilo Organizze */}
             {activeTab === 'overview' && (
