@@ -113,36 +113,6 @@ const ProgressoPage = () => {
                     </div>
                 </div>
 
-                {/* Barra de Progresso */}
-                <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        marginBottom: '0.5rem',
-                        fontSize: '0.9rem',
-                        color: 'rgba(226, 232, 240, 0.7)'
-                    }}>
-                        <span>Progresso para próxima graduação</span>
-                        <span>{progresso.percentualProgresso}%</span>
-                    </div>
-                    <div style={{
-                        width: '100%',
-                        height: '12px',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        borderRadius: '6px',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{
-                            width: `${progresso.percentualProgresso}%`,
-                            height: '100%',
-                            background: progresso.elegivel 
-                                ? 'linear-gradient(90deg, #22c55e, #16a34a)' 
-                                : 'linear-gradient(90deg, #60a5fa, #3b82f6)',
-                            transition: 'width 0.3s ease'
-                        }}></div>
-                    </div>
-                </div>
-
                 {/* Tempo Restante para Próximo Grau */}
                 {progresso.tempoRestanteProximoGrau && (
                     <div style={{
@@ -290,21 +260,6 @@ const ProgressoPage = () => {
                                 <span>Requisito: {progresso.tempoRestanteProximaFaixa.mesesNecessarios} mês(es) ({progresso.tempoRestanteProximaFaixa.diasNecessarios} dias)</span>
                             )}
                         </div>
-                    </div>
-                )}
-
-                {progresso.elegivel && !progresso.tempoRestanteProximoGrau && !progresso.tempoRestanteProximaFaixa && (
-                    <div style={{
-                        padding: '12px',
-                        borderRadius: '12px',
-                        background: 'rgba(34, 197, 94, 0.15)',
-                        color: '#22c55e',
-                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                        textAlign: 'center',
-                        fontWeight: 600,
-                        marginTop: '1rem'
-                    }}>
-                        ✅ Você está elegível para avaliação!
                     </div>
                 )}
 
