@@ -99,8 +99,9 @@ router.post('/checkin', async (req, res) => {
 
         await presenca.save();
 
-        // Atualizar contador de dias de presença do aluno
+        // Atualizar contadores de dias de presença do aluno
         aluno.diasPresencaDesdeUltimaGraduacao += 1;
+        aluno.diasPresencaDesdeUltimaTrocaFaixa += 1;
         await aluno.save();
 
         let mensagem = 'Check-in realizado com sucesso!';
@@ -198,8 +199,10 @@ router.get('/progresso', async (req, res) => {
         let proximoGrau = null;
         let proximaFaixa = null;
 
-        // Dias de presença desde a última graduação
+        // Dias de presença desde a última graduação (para graus)
         const diasPresenca = aluno.diasPresencaDesdeUltimaGraduacao || 0;
+        // Dias de presença desde a última troca de faixa (para faixas)
+        const diasPresencaFaixa = aluno.diasPresencaDesdeUltimaTrocaFaixa || 0;
 
         if (academia?.configuracoes?.faixas && academia.configuracoes.faixas.length > 0) {
             // Encontrar configuração da faixa atual
@@ -214,22 +217,23 @@ router.get('/progresso', async (req, res) => {
                 const estaNoUltimoGrau = ultimoGrauConfig && aluno.grauAtual >= ultimoGrauConfig.numero;
 
                 if (estaNoUltimoGrau) {
-                    // Aluno está no último grau da faixa, precisa mudar de faixa
+                    // Aluno está no último grau da faixa, precisa completar o tempo mínimo da faixa atual para trocar
                     const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
                     if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
                         proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
-                        // Converter tempo mínimo da faixa para dias
-                        const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
+                        // Usar o tempo mínimo da FAIXA ATUAL (não da próxima) para calcular quanto falta para trocar
+                        const mesesNecessarios = (faixaAtualConfig.tempoMinimoAnos * 12) + faixaAtualConfig.tempoMinimoMeses;
                         const diasNecessarios = converterMesesParaDias(mesesNecessarios);
-                        const diasFaltantes = Math.max(0, diasNecessarios - diasPresenca);
-                        const completo = diasPresenca >= diasNecessarios;
+                        // Usar diasPresencaFaixa para cálculo de troca de faixa
+                        const diasFaltantes = Math.max(0, diasNecessarios - diasPresencaFaixa);
+                        const completo = diasPresencaFaixa >= diasNecessarios;
                         tempoRestanteProximaFaixa = {
                             dias: diasFaltantes,
                             diasNecessarios,
-                            diasPresenca,
+                            diasPresenca: diasPresencaFaixa, // Usar contador específico para faixa
                             completo: completo,
-                            nomeFaixa: proximaFaixa.nome,
-                            mesesNecessarios // Manter para referência
+                            nomeFaixa: proximaFaixa.nome, // Nome da próxima faixa para referência
+                            mesesNecessarios // Tempo mínimo da faixa atual
                         };
                     }
                 } else {
@@ -252,25 +256,7 @@ router.get('/progresso', async (req, res) => {
                             mesesNecessarios: grauConfig.tempoMinimoMeses // Manter para referência
                         };
                     }
-
-                    // Sempre verificar se há próxima faixa disponível (para mostrar progresso futuro)
-                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
-                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
-                        const proximaFaixaFutura = academia.configuracoes.faixas[faixaAtualIndex + 1];
-                        // Mostrar progresso para próxima faixa sempre que houver uma próxima faixa
-                        const mesesNecessariosFaixa = (proximaFaixaFutura.tempoMinimoAnos * 12) + proximaFaixaFutura.tempoMinimoMeses;
-                        const diasNecessariosFaixa = converterMesesParaDias(mesesNecessariosFaixa);
-                        const diasFaltantesFaixa = Math.max(0, diasNecessariosFaixa - diasPresenca);
-                        tempoRestanteProximaFaixa = {
-                            dias: diasFaltantesFaixa,
-                            diasNecessarios: diasNecessariosFaixa,
-                            diasPresenca,
-                            completo: diasPresenca >= diasNecessariosFaixa,
-                            nomeFaixa: proximaFaixaFutura.nome,
-                            mesesNecessarios: mesesNecessariosFaixa
-                        };
-                        proximaFaixa = proximaFaixaFutura;
-                    }
+                    // Não mostrar progresso para próxima faixa quando não está no último grau
                 }
             }
         }

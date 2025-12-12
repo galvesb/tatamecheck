@@ -489,15 +489,29 @@ router.post('/alunos/:id/graduacao', async (req, res) => {
 
         await graduacao.save();
 
+        // Verificar se houve mudança de faixa
+        const mudouFaixa = aluno.faixaAtual !== faixa;
+        
         // Atualizar perfil do aluno
         aluno.faixaAtual = faixa;
         aluno.grauAtual = parseInt(grau);
-        aluno.diasPresencaDesdeUltimaGraduacao = 0;
+        aluno.dataUltimaGraduacao = new Date();
         aluno.ultimaGraduacao = {
             data: new Date(),
             faixa,
             grau: parseInt(grau)
         };
+
+        // Resetar contadores apropriados
+        if (mudouFaixa) {
+            // Se mudou de faixa, resetar ambos os contadores
+            aluno.diasPresencaDesdeUltimaGraduacao = 0;
+            aluno.diasPresencaDesdeUltimaTrocaFaixa = 0;
+        } else {
+            // Se apenas mudou de grau, resetar apenas o contador de grau
+            aluno.diasPresencaDesdeUltimaGraduacao = 0;
+            // Manter diasPresencaDesdeUltimaTrocaFaixa (não resetar)
+        }
 
         // Buscar configurações da academia para definir próximos requisitos
         const academia = await Academia.findById(aluno.academiaId);
@@ -551,7 +565,8 @@ router.get('/pendencias', async (req, res) => {
 
         // Verificar alunos elegíveis para graduação
         for (const aluno of alunos) {
-            const diasPresenca = aluno.diasPresencaDesdeUltimaGraduacao || 0;
+            const diasPresenca = aluno.diasPresencaDesdeUltimaGraduacao || 0; // Para graus
+            const diasPresencaFaixa = aluno.diasPresencaDesdeUltimaTrocaFaixa || 0; // Para faixas
             const faixaAtualConfig = academia.configuracoes?.faixas?.find(f => f.nome === aluno.faixaAtual);
             
             if (faixaAtualConfig) {
@@ -559,14 +574,16 @@ router.get('/pendencias', async (req, res) => {
                 const estaNoUltimoGrau = ultimoGrauConfig && aluno.grauAtual >= ultimoGrauConfig.numero;
 
                 if (estaNoUltimoGrau) {
-                    // Aluno está no último grau da faixa, verificar se está elegível para próxima faixa
-                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
-                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
-                        const proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
-                        const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
-                        const diasNecessarios = converterMesesParaDias(mesesNecessarios);
-                        
-                        if (diasPresenca >= diasNecessarios) {
+                    // Aluno está no último grau da faixa, verificar se está elegível para trocar de faixa
+                    // Usar o tempo mínimo da FAIXA ATUAL (não da próxima) para verificar elegibilidade
+                    const mesesNecessarios = (faixaAtualConfig.tempoMinimoAnos * 12) + faixaAtualConfig.tempoMinimoMeses;
+                    const diasNecessarios = converterMesesParaDias(mesesNecessarios);
+                    
+                    // Usar diasPresencaFaixa para verificar elegibilidade de troca de faixa
+                    if (diasPresencaFaixa >= diasNecessarios) {
+                        const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
+                        if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
+                            const proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
                             pendenciasGraduacao.push({
                                 alunoId: aluno._id,
                                 alunoNome: aluno.userId.name,
@@ -576,7 +593,7 @@ router.get('/pendencias', async (req, res) => {
                                 grauAtual: aluno.grauAtual,
                                 proximaFaixa: proximaFaixa.nome,
                                 proximoGrau: 0, // Primeiro grau da nova faixa
-                                diasPresenca,
+                                diasPresenca: diasPresencaFaixa, // Usar contador de faixa
                                 diasNecessarios,
                                 elegivel: true
                             });
@@ -590,6 +607,7 @@ router.get('/pendencias', async (req, res) => {
                     if (grauConfig) {
                         const diasNecessarios = converterMesesParaDias(grauConfig.tempoMinimoMeses);
                         
+                        // Usar diasPresenca para verificar elegibilidade de grau
                         if (diasPresenca >= diasNecessarios) {
                             pendenciasGraduacao.push({
                                 alunoId: aluno._id,
@@ -600,7 +618,7 @@ router.get('/pendencias', async (req, res) => {
                                 grauAtual: aluno.grauAtual,
                                 proximaFaixa: aluno.faixaAtual,
                                 proximoGrau: proximoGrauNum,
-                                diasPresenca,
+                                diasPresenca, // Usar contador de grau
                                 diasNecessarios,
                                 elegivel: true
                             });
@@ -668,16 +686,29 @@ router.post('/pendencias/:alunoId/confirmar-graduacao', async (req, res) => {
 
         await graduacao.save();
 
+        // Verificar se houve mudança de faixa
+        const mudouFaixa = aluno.faixaAtual !== faixa;
+        
         // Atualizar perfil do aluno
         aluno.faixaAtual = faixa;
         aluno.grauAtual = parseInt(grau);
-        aluno.diasPresencaDesdeUltimaGraduacao = 0; // Resetar contador
         aluno.dataUltimaGraduacao = new Date();
         aluno.ultimaGraduacao = {
             data: new Date(),
             faixa,
             grau: parseInt(grau)
         };
+
+        // Resetar contadores apropriados
+        if (mudouFaixa) {
+            // Se mudou de faixa, resetar ambos os contadores
+            aluno.diasPresencaDesdeUltimaGraduacao = 0;
+            aluno.diasPresencaDesdeUltimaTrocaFaixa = 0;
+        } else {
+            // Se apenas mudou de grau, resetar apenas o contador de grau
+            aluno.diasPresencaDesdeUltimaGraduacao = 0;
+            // Manter diasPresencaDesdeUltimaTrocaFaixa (não resetar)
+        }
 
         await aluno.save();
 

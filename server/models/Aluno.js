@@ -22,6 +22,10 @@ const AlunoSchema = new mongoose.Schema({
         type: Number, 
         default: 0 
     },
+    diasPresencaDesdeUltimaTrocaFaixa: {
+        type: Number,
+        default: 0
+    },
     diasNecessariosParaProximoGrau: { 
         type: Number, 
         default: 50 
