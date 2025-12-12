@@ -231,9 +231,6 @@ router.get('/progresso', async (req, res) => {
                             nomeFaixa: proximaFaixa.nome,
                             mesesNecessarios // Manter para referência
                         };
-
-                        // Não mostrar próximo objetivo até o professor confirmar a graduação
-                        // Quando está elegível, apenas mostra que está elegível
                     }
                 } else {
                     // Verificar se há próximo grau na faixa atual
@@ -254,9 +251,25 @@ router.get('/progresso', async (req, res) => {
                             completo: completo,
                             mesesNecessarios: grauConfig.tempoMinimoMeses // Manter para referência
                         };
+                    }
 
-                        // Não mostrar próximo objetivo até o professor confirmar a graduação
-                        // Quando está elegível, apenas mostra que está elegível
+                    // Sempre verificar se há próxima faixa disponível (para mostrar progresso futuro)
+                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
+                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
+                        const proximaFaixaFutura = academia.configuracoes.faixas[faixaAtualIndex + 1];
+                        // Mostrar progresso para próxima faixa sempre que houver uma próxima faixa
+                        const mesesNecessariosFaixa = (proximaFaixaFutura.tempoMinimoAnos * 12) + proximaFaixaFutura.tempoMinimoMeses;
+                        const diasNecessariosFaixa = converterMesesParaDias(mesesNecessariosFaixa);
+                        const diasFaltantesFaixa = Math.max(0, diasNecessariosFaixa - diasPresenca);
+                        tempoRestanteProximaFaixa = {
+                            dias: diasFaltantesFaixa,
+                            diasNecessarios: diasNecessariosFaixa,
+                            diasPresenca,
+                            completo: diasPresenca >= diasNecessariosFaixa,
+                            nomeFaixa: proximaFaixaFutura.nome,
+                            mesesNecessarios: mesesNecessariosFaixa
+                        };
+                        proximaFaixa = proximaFaixaFutura;
                     }
                 }
             }

@@ -575,7 +575,7 @@ router.get('/pendencias', async (req, res) => {
                                 faixaAtual: aluno.faixaAtual,
                                 grauAtual: aluno.grauAtual,
                                 proximaFaixa: proximaFaixa.nome,
-                                proximoGrau: 0,
+                                proximoGrau: 0, // Primeiro grau da nova faixa
                                 diasPresenca,
                                 diasNecessarios,
                                 elegivel: true

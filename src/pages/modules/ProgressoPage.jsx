@@ -234,7 +234,7 @@ const ProgressoPage = () => {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <strong>
-                                Próxima Faixa: {progresso.tempoRestanteProximaFaixa.nomeFaixa || progresso.proximaFaixa}
+                                Próxima Faixa: {progresso.tempoRestanteProximaFaixa.nomeFaixa || progresso.proximaFaixa || 'N/A'}
                             </strong>
                             {progresso.tempoRestanteProximaFaixa.completo ? (
                                 <span style={{ color: '#22c55e', fontWeight: 600 }}>✅ Elegível</span>
