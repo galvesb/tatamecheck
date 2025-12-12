@@ -8,8 +8,8 @@ const GraduacaoSchema = new mongoose.Schema({
     },
     faixa: { 
         type: String, 
-        enum: ['Branca', 'Azul', 'Roxa', 'Marrom', 'Preta'],
         required: true
+        // Removido enum para permitir faixas configuradas dinamicamente pelo administrador
     },
     grau: { 
         type: Number, 

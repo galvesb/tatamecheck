@@ -9,8 +9,8 @@ const AlunoSchema = new mongoose.Schema({
     },
     faixaAtual: { 
         type: String, 
-        enum: ['Branca', 'Azul', 'Roxa', 'Marrom', 'Preta'],
-        default: 'Branca'
+        required: true
+        // Removido enum para permitir faixas configuradas dinamicamente pelo administrador
     },
     grauAtual: { 
         type: Number, 

@@ -178,6 +178,90 @@ router.get('/progresso', async (req, res) => {
             .sort({ data: -1 })
             .populate('avaliadoPor', 'name');
 
+        // Calcular tempo restante para próximo grau e próxima faixa
+        let tempoRestanteProximoGrau = null;
+        let tempoRestanteProximaFaixa = null;
+        let proximoGrau = null;
+        let proximaFaixa = null;
+
+        if (academia?.configuracoes?.faixas && academia.configuracoes.faixas.length > 0) {
+            // Encontrar configuração da faixa atual
+            const faixaAtualConfig = academia.configuracoes.faixas.find(f => f.nome === aluno.faixaAtual);
+            
+            // Calcular meses decorridos desde a última graduação
+            const dataUltimaGraduacao = aluno.ultimaGraduacao?.data || aluno.createdAt;
+            const agora = new Date();
+            const dataInicio = new Date(dataUltimaGraduacao);
+            
+            // Calcular diferença em meses de forma mais precisa
+            const anosDiff = agora.getFullYear() - dataInicio.getFullYear();
+            const mesesDiff = agora.getMonth() - dataInicio.getMonth();
+            const diasDiff = agora.getDate() - dataInicio.getDate();
+            let mesesDecorridos = anosDiff * 12 + mesesDiff;
+            
+            // Se os dias indicam que ainda não completou o mês atual, reduzir 1
+            if (diasDiff < 0) {
+                mesesDecorridos -= 1;
+            }
+            mesesDecorridos = Math.max(0, mesesDecorridos);
+
+            if (faixaAtualConfig) {
+                // Verificar se há próximo grau na faixa atual
+                const proximoGrauNum = aluno.grauAtual + 1;
+                const grauConfig = faixaAtualConfig.graus.find(g => g.numero === proximoGrauNum);
+
+                if (grauConfig) {
+                    // Há próximo grau na faixa atual
+                    proximoGrau = `${proximoGrauNum}º Grau`;
+                    const mesesNecessarios = grauConfig.tempoMinimoMeses;
+                    const mesesFaltantes = Math.max(0, mesesNecessarios - mesesDecorridos);
+                    tempoRestanteProximoGrau = {
+                        meses: mesesFaltantes,
+                        mesesNecessarios,
+                        mesesDecorridos,
+                        completo: mesesDecorridos >= mesesNecessarios
+                    };
+                }
+                
+                // Verificar se está no último grau da faixa para mostrar próxima faixa
+                const ultimoGrauConfig = faixaAtualConfig.graus[faixaAtualConfig.graus.length - 1];
+                if (ultimoGrauConfig && aluno.grauAtual >= ultimoGrauConfig.numero) {
+                    // Aluno está no último grau ou além, precisa mudar de faixa
+                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
+                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
+                        proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
+                        const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
+                        const mesesFaltantes = Math.max(0, mesesNecessarios - mesesDecorridos);
+                        tempoRestanteProximaFaixa = {
+                            meses: mesesFaltantes,
+                            mesesNecessarios,
+                            mesesDecorridos,
+                            completo: mesesDecorridos >= mesesNecessarios,
+                            nomeFaixa: proximaFaixa.nome
+                        };
+                        // Limpar próximo grau se já está no último
+                        tempoRestanteProximoGrau = null;
+                        proximoGrau = null;
+                    }
+                } else if (!grauConfig) {
+                    // Não há próximo grau configurado, mostrar próxima faixa
+                    const faixaAtualIndex = academia.configuracoes.faixas.findIndex(f => f.nome === aluno.faixaAtual);
+                    if (faixaAtualIndex >= 0 && faixaAtualIndex < academia.configuracoes.faixas.length - 1) {
+                        proximaFaixa = academia.configuracoes.faixas[faixaAtualIndex + 1];
+                        const mesesNecessarios = (proximaFaixa.tempoMinimoAnos * 12) + proximaFaixa.tempoMinimoMeses;
+                        const mesesFaltantes = Math.max(0, mesesNecessarios - mesesDecorridos);
+                        tempoRestanteProximaFaixa = {
+                            meses: mesesFaltantes,
+                            mesesNecessarios,
+                            mesesDecorridos,
+                            completo: mesesDecorridos >= mesesNecessarios,
+                            nomeFaixa: proximaFaixa.nome
+                        };
+                    }
+                }
+            }
+        }
+
         res.json({
             faixaAtual: aluno.faixaAtual,
             grauAtual: aluno.grauAtual,
@@ -191,7 +275,11 @@ router.get('/progresso', async (req, res) => {
                 grau: ultimaGraduacao.grau,
                 data: ultimaGraduacao.data,
                 avaliadoPor: ultimaGraduacao.avaliadoPor?.name
-            } : null
+            } : null,
+            tempoRestanteProximoGrau,
+            tempoRestanteProximaFaixa,
+            proximoGrau,
+            proximaFaixa: proximaFaixa?.nome || null
         });
     } catch (err) {
         console.error('Error fetching progresso:', err);

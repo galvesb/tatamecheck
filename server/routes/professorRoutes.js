@@ -61,6 +61,23 @@ router.post('/alunos', async (req, res) => {
             await academia.save();
         }
 
+        // Validar faixa inicial contra as faixas configuradas
+        if (academia.configuracoes?.faixas && academia.configuracoes.faixas.length > 0) {
+            const faixaConfig = academia.configuracoes.faixas.find(f => f.nome === faixaInicial);
+            if (!faixaConfig) {
+                return res.status(400).json({ 
+                    message: `Faixa "${faixaInicial}" não está configurada na academia. Faixas disponíveis: ${academia.configuracoes.faixas.map(f => f.nome).join(', ')}` 
+                });
+            }
+
+            // Validar grau inicial
+            if (grauInicial < 0 || grauInicial >= faixaConfig.numeroMaximoGraus) {
+                return res.status(400).json({ 
+                    message: `Grau inicial deve estar entre 0 e ${faixaConfig.numeroMaximoGraus - 1} para a faixa ${faixaInicial}` 
+                });
+            }
+        }
+
         // Criar perfil de aluno
         const aluno = new Aluno({
             userId: user._id,
@@ -68,7 +85,13 @@ router.post('/alunos', async (req, res) => {
             faixaAtual: faixaInicial,
             grauAtual: grauInicial,
             diasPresencaDesdeUltimaGraduacao: 0,
-            diasNecessariosParaProximoGrau: academia.configuracoes?.diasMinimosParaGraduacao || 50
+            diasNecessariosParaProximoGrau: academia.configuracoes?.diasMinimosParaGraduacao || 50,
+            ultimaGraduacao: {
+                data: new Date(),
+                faixa: faixaInicial,
+                grau: grauInicial
+            },
+            dataUltimaGraduacao: new Date()
         });
 
         await aluno.save();

@@ -143,7 +143,71 @@ const ProgressoPage = () => {
                     </div>
                 </div>
 
-                {progresso.elegivel && (
+                {/* Tempo Restante para Próximo Grau */}
+                {progresso.tempoRestanteProximoGrau && (
+                    <div style={{
+                        marginTop: '1rem',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: progresso.tempoRestanteProximoGrau.completo 
+                            ? 'rgba(34, 197, 94, 0.15)' 
+                            : 'rgba(59, 130, 246, 0.1)',
+                        border: `1px solid ${progresso.tempoRestanteProximoGrau.completo 
+                            ? 'rgba(34, 197, 94, 0.3)' 
+                            : 'rgba(59, 130, 246, 0.2)'}`,
+                        fontSize: '0.9rem'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <strong>
+                                Próximo Grau: {progresso.proximoGrau || `${progresso.grauAtual + 1}º Grau`}
+                            </strong>
+                            {progresso.tempoRestanteProximoGrau.completo ? (
+                                <span style={{ color: '#22c55e', fontWeight: 600 }}>✅ Elegível</span>
+                            ) : (
+                                <span style={{ color: '#60a5fa', fontWeight: 600 }}>
+                                    {progresso.tempoRestanteProximoGrau.meses} mês(es) restante(s)
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'rgba(226, 232, 240, 0.7)' }}>
+                            Tempo decorrido: {progresso.tempoRestanteProximoGrau.mesesDecorridos} de {progresso.tempoRestanteProximoGrau.mesesNecessarios} meses necessários
+                        </div>
+                    </div>
+                )}
+
+                {/* Tempo Restante para Próxima Faixa */}
+                {progresso.tempoRestanteProximaFaixa && (
+                    <div style={{
+                        marginTop: '1rem',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: progresso.tempoRestanteProximaFaixa.completo 
+                            ? 'rgba(34, 197, 94, 0.15)' 
+                            : 'rgba(251, 191, 36, 0.1)',
+                        border: `1px solid ${progresso.tempoRestanteProximaFaixa.completo 
+                            ? 'rgba(34, 197, 94, 0.3)' 
+                            : 'rgba(251, 191, 36, 0.3)'}`,
+                        fontSize: '0.9rem'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <strong>
+                                Próxima Faixa: {progresso.tempoRestanteProximaFaixa.nomeFaixa || progresso.proximaFaixa}
+                            </strong>
+                            {progresso.tempoRestanteProximaFaixa.completo ? (
+                                <span style={{ color: '#22c55e', fontWeight: 600 }}>✅ Elegível</span>
+                            ) : (
+                                <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+                                    {progresso.tempoRestanteProximaFaixa.meses} mês(es) restante(s)
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'rgba(226, 232, 240, 0.7)' }}>
+                            Tempo decorrido: {progresso.tempoRestanteProximaFaixa.mesesDecorridos} de {progresso.tempoRestanteProximaFaixa.mesesNecessarios} meses necessários
+                        </div>
+                    </div>
+                )}
+
+                {progresso.elegivel && !progresso.tempoRestanteProximoGrau && !progresso.tempoRestanteProximaFaixa && (
                     <div style={{
                         padding: '12px',
                         borderRadius: '12px',
@@ -151,7 +215,8 @@ const ProgressoPage = () => {
                         color: '#22c55e',
                         border: '1px solid rgba(34, 197, 94, 0.3)',
                         textAlign: 'center',
-                        fontWeight: 600
+                        fontWeight: 600,
+                        marginTop: '1rem'
                     }}>
                         ✅ Você está elegível para avaliação!
                     </div>

@@ -8,11 +8,13 @@ const GerenciarAlunos = () => {
     const [alunos, setAlunos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [faixas, setFaixas] = useState([]);
+    const [loadingFaixas, setLoadingFaixas] = useState(true);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: '',
-        faixaInicial: 'Branca',
+        faixaInicial: '',
         grauInicial: 0
     });
     const [error, setError] = useState('');
@@ -20,7 +22,31 @@ const GerenciarAlunos = () => {
 
     useEffect(() => {
         carregarAlunos();
+        carregarFaixas();
     }, []);
+
+    const carregarFaixas = async () => {
+        try {
+            setLoadingFaixas(true);
+            const res = await axios.get('/api/professor/configuracoes/faixas');
+            const faixasOrdenadas = (res.data.faixas || []).sort((a, b) => a.ordem - b.ordem);
+            setFaixas(faixasOrdenadas);
+            
+            // Se não há faixa selecionada e há faixas disponíveis, definir a primeira
+            if (!formData.faixaInicial && faixasOrdenadas.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    faixaInicial: faixasOrdenadas[0].nome,
+                    grauInicial: 0
+                }));
+            }
+        } catch (err) {
+            console.error('Erro ao carregar faixas:', err);
+            setError('Erro ao carregar configurações de faixas');
+        } finally {
+            setLoadingFaixas(false);
+        }
+    };
 
     const carregarAlunos = async () => {
         try {
@@ -40,14 +66,37 @@ const GerenciarAlunos = () => {
         setError('');
         setSuccess('');
 
+        // Validar se há faixas configuradas
+        if (faixas.length === 0) {
+            setError('Configure pelo menos uma faixa no módulo "Configurações" antes de cadastrar alunos.');
+            return;
+        }
+
+        // Validar se a faixa foi selecionada
+        if (!formData.faixaInicial) {
+            setError('Selecione uma faixa inicial.');
+            return;
+        }
+
+        // Validar grau inicial
+        const faixaSelecionada = faixas.find(f => f.nome === formData.faixaInicial);
+        if (faixaSelecionada) {
+            const maxGrau = faixaSelecionada.numeroMaximoGraus - 1;
+            if (formData.grauInicial < 0 || formData.grauInicial > maxGrau) {
+                setError(`O grau inicial deve estar entre 0 e ${maxGrau} para a faixa ${formData.faixaInicial}.`);
+                return;
+            }
+        }
+
         try {
             await axios.post('/api/professor/alunos', formData);
             setSuccess('Aluno cadastrado com sucesso!');
+            const primeiraFaixa = faixas.length > 0 ? faixas[0].nome : '';
             setFormData({
                 name: '',
                 email: '',
                 password: '',
-                faixaInicial: 'Branca',
+                faixaInicial: primeiraFaixa,
                 grauInicial: 0
             });
             setShowForm(false);
@@ -94,6 +143,19 @@ const GerenciarAlunos = () => {
                                 {success}
                             </div>
                         )}
+                        {faixas.length === 0 && !loadingFaixas && (
+                            <div style={{
+                                padding: '12px',
+                                borderRadius: '12px',
+                                background: 'rgba(251, 191, 36, 0.15)',
+                                color: '#fbbf24',
+                                border: '1px solid rgba(251, 191, 36, 0.3)',
+                                marginBottom: '1rem',
+                                fontSize: '0.9rem'
+                            }}>
+                                ⚠️ Nenhuma faixa configurada. Configure as faixas no módulo "Configurações" antes de cadastrar alunos.
+                            </div>
+                        )}
 
                         <div className="auth-form">
                             <label>
@@ -129,29 +191,77 @@ const GerenciarAlunos = () => {
                             </label>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <label>
-                                    <span>Faixa Inicial</span>
-                                    <select
-                                        className="form-select"
-                                        value={formData.faixaInicial}
-                                        onChange={(e) => setFormData({ ...formData, faixaInicial: e.target.value })}
-                                    >
-                                        <option value="Branca">Branca</option>
-                                        <option value="Azul">Azul</option>
-                                        <option value="Roxa">Roxa</option>
-                                        <option value="Marrom">Marrom</option>
-                                        <option value="Preta">Preta</option>
-                                    </select>
+                                    <span>Faixa Inicial *</span>
+                                    {loadingFaixas ? (
+                                        <input
+                                            type="text"
+                                            value="Carregando faixas..."
+                                            disabled
+                                            style={{ opacity: 0.5 }}
+                                        />
+                                    ) : faixas.length === 0 ? (
+                                        <input
+                                            type="text"
+                                            value="Nenhuma faixa configurada"
+                                            disabled
+                                            style={{ opacity: 0.5 }}
+                                        />
+                                    ) : (
+                                        <select
+                                            className="form-select"
+                                            value={formData.faixaInicial}
+                                            onChange={(e) => {
+                                                const faixaSelecionada = faixas.find(f => f.nome === e.target.value);
+                                                const maxGrau = faixaSelecionada ? faixaSelecionada.numeroMaximoGraus - 1 : 0;
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    faixaInicial: e.target.value,
+                                                    grauInicial: Math.min(formData.grauInicial, maxGrau)
+                                                });
+                                            }}
+                                            required
+                                        >
+                                            {faixas.map((faixa) => (
+                                                <option key={faixa.nome} value={faixa.nome}>
+                                                    {faixa.ordem}. {faixa.nome}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </label>
                                 <label>
-                                    <span>Grau Inicial</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="4"
-                                        value={formData.grauInicial}
-                                        onChange={(e) => setFormData({ ...formData, grauInicial: parseInt(e.target.value) || 0 })}
-                                        required
-                                    />
+                                    <span>Grau Inicial *</span>
+                                    {(() => {
+                                        const faixaSelecionada = faixas.find(f => f.nome === formData.faixaInicial);
+                                        const maxGrau = faixaSelecionada ? faixaSelecionada.numeroMaximoGraus - 1 : 4;
+                                        
+                                        return (
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max={maxGrau}
+                                                value={formData.grauInicial}
+                                                onChange={(e) => {
+                                                    const valor = parseInt(e.target.value) || 0;
+                                                    setFormData({ ...formData, grauInicial: Math.min(valor, maxGrau) });
+                                                }}
+                                                required
+                                                disabled={!faixaSelecionada}
+                                                placeholder={faixaSelecionada ? `0 a ${maxGrau}` : 'Selecione uma faixa'}
+                                            />
+                                        );
+                                    })()}
+                                    {(() => {
+                                        const faixaSelecionada = faixas.find(f => f.nome === formData.faixaInicial);
+                                        if (faixaSelecionada) {
+                                            return (
+                                                <small style={{ color: 'rgba(226, 232, 240, 0.5)', fontSize: '0.85rem', display: 'block', marginTop: '4px' }}>
+                                                    Máximo: {faixaSelecionada.numeroMaximoGraus} grau(s)
+                                                </small>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </label>
                             </div>
                             <button type="submit" className="btn primary" style={{ marginTop: '1rem' }}>
