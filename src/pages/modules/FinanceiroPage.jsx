@@ -371,6 +371,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         console.warn('⚠️ Receita recorrente sem dataFinal definida');
                     }
                     payload.data = payload.dataInicio; // Usar dataInicio como data base também
+                    // Sempre usar frequência mensal para receitas
+                    payload.frequenciaRecorrencia = 'mensal';
                     console.log('📤 Enviando receita recorrente:', { 
                         recorrente: payload.recorrente, 
                         dataInicio: payload.dataInicio, 
@@ -831,29 +833,6 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
 
                     {formData.recorrente && (
                         <>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                    Frequência
-                                </label>
-                                <select
-                                    value={formData.frequenciaRecorrencia || 'mensal'}
-                                    onChange={(e) => setFormData({ ...formData, frequenciaRecorrencia: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.875rem',
-                                        borderRadius: '10px',
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                        color: '#fff',
-                                        fontSize: '0.95rem'
-                                    }}
-                                >
-                                    <option value="mensal">Mensal</option>
-                                    <option value="trimestral">Trimestral</option>
-                                    <option value="semestral">Semestral</option>
-                                    <option value="anual">Anual</option>
-                                </select>
-                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
@@ -914,7 +893,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     color: '#60a5fa',
                                     fontSize: '0.85rem'
                                 }}>
-                                    💡 Serão criadas automaticamente todas as ocorrências de {formData.frequenciaRecorrencia} de {new Date(formData.dataInicio).toLocaleDateString('pt-BR')} até {new Date(formData.dataFinal).toLocaleDateString('pt-BR')}.
+                                    💡 Serão criadas automaticamente todas as ocorrências mensais de {new Date(formData.dataInicio).toLocaleDateString('pt-BR')} até {new Date(formData.dataFinal).toLocaleDateString('pt-BR')}.
                                 </div>
                             )}
                         </>
