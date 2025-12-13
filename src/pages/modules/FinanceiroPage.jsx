@@ -74,20 +74,24 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         }
     };
 
-    const carregarResumo = async () => {
+    const carregarResumo = async (controlarLoading = true) => {
         try {
-            setLoading(true);
+            if (controlarLoading) setLoading(true);
             const params = {};
             if (filtros.dataInicio) params.dataInicio = filtros.dataInicio;
             if (filtros.dataFim) params.dataFim = filtros.dataFim;
             
             const res = await axios.get('/api/financeiro/resumo', { params });
             setResumo(res.data);
+            // Limpar erro se houver sucesso
+            if (error && error.includes('resumo')) {
+                setError(null);
+            }
         } catch (err) {
             console.error('Erro ao carregar resumo:', err);
             setError('Erro ao carregar resumo financeiro');
         } finally {
-            setLoading(false);
+            if (controlarLoading) setLoading(false);
         }
     };
 
@@ -133,7 +137,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
     const carregarPagamentosReceber = async () => {
         try {
             setLoading(true);
-            const params = {};
+            const params = {}; // Todos os pagamentos a receber são mensalidades
             if (filtros.dataInicio) params.dataVencimentoInicio = filtros.dataInicio;
             if (filtros.dataFim) params.dataVencimentoFim = filtros.dataFim;
             if (filtros.status) params.recebido = filtros.status === 'recebido';
@@ -142,10 +146,30 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             const res = await axios.get('/api/financeiro/pagamentos-receber', { params });
             setPagamentosReceber(res.data.pagamentos || []);
         } catch (err) {
-            console.error('Erro ao carregar pagamentos a receber:', err);
-            setError('Erro ao carregar pagamentos a receber');
+            console.error('Erro ao carregar mensalidades:', err);
+            setError('Erro ao carregar mensalidades');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const marcarComoRecebido = async (pagamentoId) => {
+        try {
+            setLoading(true);
+            const res = await axios.patch(`/api/financeiro/pagamentos-receber/${pagamentoId}/marcar-recebido`);
+            setSuccess('Mensalidade marcada como recebida com sucesso!');
+            setLoading(false);
+            
+            // Atualizar resumo sem controlar loading para evitar conflito
+            await carregarResumo(false);
+            await carregarPagamentosReceber();
+            
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error('Erro ao marcar como recebido:', err);
+            setError('Erro ao marcar mensalidade como recebida');
+            setLoading(false);
+            setTimeout(() => setError(null), 3000);
         }
     };
 
@@ -162,11 +186,16 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         }
         
         if (item) {
+            // Se for um pagamento, usar dataVencimento como data
+            const dataValue = item.tipo === 'pagamento' 
+                ? (item.dataVencimento ? new Date(item.dataVencimento).toISOString().split('T')[0] : '')
+                : (item.data ? new Date(item.data).toISOString().split('T')[0] : '');
+            
             setFormData({
                 descricao: item.descricao || '',
                 valor: item.valor || '',
-                categoria: item.categoria || '',
-                data: item.data ? new Date(item.data).toISOString().split('T')[0] : '',
+                categoria: item.categoria || (item.tipo === 'pagamento' ? 'mensalidade' : ''),
+                data: dataValue,
                 dataVencimento: item.dataVencimento ? new Date(item.dataVencimento).toISOString().split('T')[0] : '',
                 dataRecebimento: item.dataRecebimento ? new Date(item.dataRecebimento).toISOString().split('T')[0] : '',
                 dataPagamento: item.dataPagamento ? new Date(item.dataPagamento).toISOString().split('T')[0] : '',
@@ -219,43 +248,63 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         setSuccess(null);
 
         try {
-            let url;
-            if (formType === 'pagamento') {
-                url = editingItem 
-                    ? `/api/financeiro/pagamentos-receber/${editingItem._id}`
-                    : `/api/financeiro/pagamentos-receber`;
-            } else {
-                url = editingItem 
-                    ? `/api/financeiro/${formType}s/${editingItem._id}`
-                    : `/api/financeiro/${formType}s`;
-            }
-            
+            setLoading(true);
             const method = editingItem ? 'put' : 'post';
             const payload = { ...formData };
-            if (formType === 'pagamento' && !payload.alunoId) {
-                setError('Selecione um aluno');
-                return;
-            }
-
-            await axios[method](url, payload);
             
-            setSuccess(editingItem ? `${formType} atualizado com sucesso!` : `${formType} criado com sucesso!`);
+            // Se houver data de recebimento/pagamento, marcar automaticamente como recebido/pago
+            if (formType === 'receita' && payload.dataRecebimento) {
+                payload.recebido = true;
+            }
+            if (formType === 'despesa' && payload.dataPagamento) {
+                payload.pago = true;
+            }
+            
+            // Verificar se está editando um pagamento (tem _id e tipo === 'pagamento')
+            const isEditingPagamento = editingItem && editingItem._id && editingItem.tipo === 'pagamento';
+            
+            // Se for receita com aluno e dataVencimento, ou se estiver editando um pagamento, usar endpoint de pagamentos
+            if ((formType === 'receita' && payload.alunoId && payload.dataVencimento) || isEditingPagamento) {
+                const pagamentoUrl = isEditingPagamento
+                    ? `/api/financeiro/pagamentos-receber/${editingItem._id}`
+                    : `/api/financeiro/pagamentos-receber`;
+                await axios[method](pagamentoUrl, {
+                    alunoId: payload.alunoId,
+                    descricao: payload.descricao,
+                    valor: payload.valor,
+                    dataVencimento: payload.dataVencimento,
+                    dataRecebimento: payload.dataRecebimento,
+                    recebido: payload.recebido || (payload.dataRecebimento ? true : false),
+                    recorrente: payload.recorrente || false,
+                    frequenciaRecorrencia: payload.frequenciaRecorrencia || 'mensal',
+                    proximaOcorrencia: payload.proximaOcorrencia,
+                    observacoes: payload.observacoes
+                });
+            } else {
+                // Criar como receita normal
+                const url = editingItem 
+                    ? `/api/financeiro/${formType}s/${editingItem._id}`
+                    : `/api/financeiro/${formType}s`;
+                await axios[method](url, payload);
+            }
+            
+            const tipoCriado = (formType === 'receita' && payload.alunoId && payload.dataVencimento) ? 'pagamento a receber' : formType;
+            setSuccess(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`);
             fecharFormulario();
             
-            // Sempre atualizar o resumo quando houver mudanças
-            await carregarResumo();
+            // Atualizar tudo em paralelo para garantir que está tudo atualizado
+            await Promise.all([
+                carregarResumo(false),
+                activeTab === 'despesas' ? carregarDespesas() : Promise.resolve(),
+                activeTab === 'receitas' ? Promise.all([carregarReceitas(), carregarPagamentosReceber()]) : Promise.resolve(),
+                activeTab === 'pagamentos' ? carregarPagamentosReceber() : Promise.resolve()
+            ]);
             
-            // Atualizar a lista da tab ativa
-            if (activeTab === 'despesas') {
-                await carregarDespesas();
-            } else if (activeTab === 'receitas') {
-                await carregarReceitas();
-            } else if (activeTab === 'pagamentos') {
-                await carregarPagamentosReceber();
-            }
+            setLoading(false);
         } catch (err) {
             console.error(`Erro ao ${editingItem ? 'atualizar' : 'criar'} ${formType}:`, err);
             setError(err.response?.data?.message || `Erro ao ${editingItem ? 'atualizar' : 'criar'} ${formType}`);
+            setLoading(false);
         }
     };
 
@@ -265,26 +314,26 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         }
 
         try {
+            setLoading(true);
             const url = tipo === 'pagamento' 
                 ? `/api/financeiro/pagamentos-receber/${id}`
                 : `/api/financeiro/${tipo}s/${id}`;
             await axios.delete(url);
             setSuccess(`${tipo} deletado com sucesso!`);
             
-            // Sempre atualizar o resumo quando houver mudanças
-            await carregarResumo();
+            // Atualizar tudo em paralelo para garantir que está tudo atualizado
+            await Promise.all([
+                carregarResumo(false),
+                activeTab === 'despesas' ? carregarDespesas() : Promise.resolve(),
+                activeTab === 'receitas' ? carregarReceitas() : Promise.resolve(),
+                activeTab === 'pagamentos' ? carregarPagamentosReceber() : Promise.resolve()
+            ]);
             
-            // Atualizar a lista da tab ativa
-            if (activeTab === 'despesas') {
-                await carregarDespesas();
-            } else if (activeTab === 'receitas') {
-                await carregarReceitas();
-            } else if (activeTab === 'pagamentos') {
-                await carregarPagamentosReceber();
-            }
+            setLoading(false);
         } catch (err) {
             console.error(`Erro ao deletar ${tipo}:`, err);
             setError(err.response?.data?.message || `Erro ao deletar ${tipo}`);
+            setLoading(false);
         }
     };
 
@@ -312,7 +361,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             <div className="card" style={{ marginBottom: '16px', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
-                        {editingItem ? `Editar ${formType === 'despesa' ? 'Despesa' : formType === 'receita' ? 'Receita' : 'Pagamento'}` : `Nova ${formType === 'despesa' ? 'Despesa' : formType === 'receita' ? 'Receita' : 'Pagamento'}`}
+                        {editingItem 
+                            ? `Editar ${formType === 'despesa' ? 'Despesa' : editingItem.tipo === 'pagamento' ? 'Pagamento a Receber' : 'Receita'}` 
+                            : `Nova ${formType === 'despesa' ? 'Despesa' : 'Receita'}`}
                     </h2>
                     <button
                         onClick={fecharFormulario}
@@ -469,7 +520,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                 <input
                                     type="checkbox"
                                     checked={formData.pago || false}
-                                    onChange={(e) => setFormData({ ...formData, pago: e.target.checked, dataPagamento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
+                                    onChange={(e) => setFormData({ ...formData, pago: e.target.checked, dataPagamento: e.target.checked ? (formData.dataPagamento || new Date().toISOString().split('T')[0]) : '' })}
                                     style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                                 />
                                 <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como pago</label>
@@ -482,7 +533,14 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     <input
                                         type="date"
                                         value={formData.dataPagamento || ''}
-                                        onChange={(e) => setFormData({ ...formData, dataPagamento: e.target.value })}
+                                        onChange={(e) => {
+                                            const dataPagamento = e.target.value;
+                                            setFormData({ 
+                                                ...formData, 
+                                                dataPagamento,
+                                                pago: dataPagamento ? true : formData.pago // Se preencher data, marca como pago
+                                            });
+                                        }}
                                         style={{
                                             width: '100%',
                                             padding: '0.875rem',
@@ -571,12 +629,12 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                        Data Recebimento
+                                        Data Vencimento (opcional)
                                     </label>
                                     <input
                                         type="date"
-                                        value={formData.dataRecebimento || ''}
-                                        onChange={(e) => setFormData({ ...formData, dataRecebimento: e.target.value })}
+                                        value={formData.dataVencimento || ''}
+                                        onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '0.875rem',
@@ -586,6 +644,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                             color: '#fff',
                                             fontSize: '0.95rem'
                                         }}
+                                        placeholder="Para criar um pagamento a receber, preencha aluno e data de vencimento"
                                     />
                                 </div>
                             </div>
@@ -593,65 +652,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                 <input
                                     type="checkbox"
                                     checked={formData.recebido || false}
-                                    onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
-                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                                />
-                                <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
-                            </div>
-                        </>
-                    )}
-
-                    {formType === 'pagamento' && (
-                        <>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                    Aluno *
-                                </label>
-                                <select
-                                    value={formData.alunoId || ''}
-                                    onChange={(e) => setFormData({ ...formData, alunoId: e.target.value })}
-                                    required
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.875rem',
-                                        borderRadius: '10px',
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                        color: '#fff',
-                                        fontSize: '0.95rem'
-                                    }}
-                                >
-                                    <option value="">Selecione...</option>
-                                    {alunos.map(aluno => (
-                                        <option key={aluno.id} value={aluno.id}>{aluno.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                    Data Vencimento *
-                                </label>
-                                <input
-                                    type="date"
-                                    value={formData.dataVencimento || ''}
-                                    onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
-                                    required
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.875rem',
-                                        borderRadius: '10px',
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                        color: '#fff',
-                                        fontSize: '0.95rem'
-                                    }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.recebido || false}
-                                    onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
+                                    onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? (formData.dataRecebimento || new Date().toISOString().split('T')[0]) : '' })}
                                     style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                                 />
                                 <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
@@ -664,7 +665,14 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     <input
                                         type="date"
                                         value={formData.dataRecebimento || ''}
-                                        onChange={(e) => setFormData({ ...formData, dataRecebimento: e.target.value })}
+                                        onChange={(e) => {
+                                            const dataRecebimento = e.target.value;
+                                            setFormData({ 
+                                                ...formData, 
+                                                dataRecebimento,
+                                                recebido: dataRecebimento ? true : formData.recebido // Se preencher data, marca como recebido
+                                            });
+                                        }}
                                         style={{
                                             width: '100%',
                                             padding: '0.875rem',
@@ -675,6 +683,18 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                             fontSize: '0.95rem'
                                         }}
                                     />
+                                </div>
+                            )}
+                            {formData.alunoId && formData.dataVencimento && (
+                                <div style={{
+                                    padding: '0.75rem',
+                                    borderRadius: '8px',
+                                    background: 'rgba(251, 191, 36, 0.1)',
+                                    border: '1px solid rgba(251, 191, 36, 0.2)',
+                                    color: '#fbbf24',
+                                    fontSize: '0.85rem'
+                                }}>
+                                    💡 Esta receita será criada como um <strong>Pagamento a Receber</strong> vinculado ao aluno.
                                 </div>
                             )}
                         </>
@@ -1604,14 +1624,14 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 </div>
             )}
 
-            {/* Pagamentos a Receber - Estilo Organizze */}
+            {/* Controle de Mensalidades */}
             {activeTab === 'pagamentos' && (
                 <div>
                     <div className="card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
                         <div style={{ 
                             marginBottom: '1.5rem'
                         }}>
-                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>Pagamentos a Receber</h3>
+                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>Controle de Mensalidades</h3>
                         </div>
 
                         {/* Filtros Compactos */}
@@ -1681,8 +1701,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     }}
                                 >
                                     <option value="">Todos</option>
-                                    <option value="recebido">Recebido</option>
-                                    <option value="pendente">Pendente</option>
+                                    <option value="recebido">Pagas</option>
+                                    <option value="pendente">Pendentes</option>
                                 </select>
                             </div>
                             <div>
@@ -1717,122 +1737,248 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         ) : pagamentosReceber.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '3rem', color: 'rgba(226, 232, 240, 0.7)' }}>
                                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
-                                <p style={{ fontSize: '0.95rem' }}>Nenhum pagamento a receber encontrado</p>
+                                <p style={{ fontSize: '0.95rem' }}>Nenhuma mensalidade encontrada</p>
                             </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {pagamentosReceber.map(pagamento => {
-                                    const vencido = new Date(pagamento.dataVencimento) < new Date() && !pagamento.recebido;
-                                    return (
-                                        <div
-                                            key={pagamento._id}
-                                            style={{
-                                                padding: '1.25rem',
-                                                borderRadius: '12px',
-                                                background: vencido 
-                                                    ? 'rgba(244, 63, 94, 0.08)' 
-                                                    : 'rgba(255, 255, 255, 0.04)',
-                                                border: `1px solid ${vencido ? 'rgba(244, 63, 94, 0.2)' : 'rgba(255, 255, 255, 0.08)'}`,
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                flexWrap: 'wrap',
-                                                gap: '1rem',
-                                                transition: 'all 0.2s',
-                                                cursor: 'pointer'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = vencido 
-                                                    ? 'rgba(244, 63, 94, 0.12)' 
-                                                    : 'rgba(255, 255, 255, 0.06)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = vencido 
-                                                    ? 'rgba(244, 63, 94, 0.08)' 
-                                                    : 'rgba(255, 255, 255, 0.04)';
-                                            }}
-                                        >
-                                            <div style={{ flex: 1, minWidth: '200px' }}>
-                                                <div style={{ 
-                                                    fontWeight: 600, 
-                                                    marginBottom: '0.5rem', 
-                                                    color: '#e2e8f0', 
-                                                    fontSize: '1.05rem' 
-                                                }}>
-                                                    {pagamento.descricao}
-                                                </div>
-                                                <div style={{ 
-                                                    fontSize: '0.85rem', 
-                                                    color: 'rgba(226, 232, 240, 0.6)', 
-                                                    display: 'flex', 
-                                                    gap: '0.75rem', 
-                                                    flexWrap: 'wrap' 
-                                                }}>
-                                                    <span>{pagamento.alunoId?.userId?.name || 'N/A'}</span>
-                                                    <span>•</span>
-                                                    <span>Venc: {new Date(pagamento.dataVencimento).toLocaleDateString('pt-BR')}</span>
-                                                    {pagamento.recorrente && <span>🔄</span>}
-                                                    {vencido && <span style={{ color: '#f87171', fontWeight: 600 }}>⚠️ Vencido</span>}
-                                                </div>
+                        ) : (() => {
+                            const hoje = new Date();
+                            hoje.setHours(0, 0, 0, 0);
+                            
+                            // Organizar mensalidades por status
+                            const mensalidadesVencidas = pagamentosReceber.filter(p => {
+                                const vencimento = new Date(p.dataVencimento);
+                                vencimento.setHours(0, 0, 0, 0);
+                                return vencimento < hoje && !p.recebido;
+                            });
+                            
+                            const mensalidadesPendentes = pagamentosReceber.filter(p => {
+                                const vencimento = new Date(p.dataVencimento);
+                                vencimento.setHours(0, 0, 0, 0);
+                                return vencimento >= hoje && !p.recebido;
+                            });
+                            
+                            const mensalidadesPagas = pagamentosReceber.filter(p => p.recebido);
+
+                            const renderMensalidade = (pagamento) => {
+                                const vencido = new Date(pagamento.dataVencimento) < hoje && !pagamento.recebido;
+                                return (
+                                    <div
+                                        key={pagamento._id}
+                                        style={{
+                                            padding: '1.25rem',
+                                            borderRadius: '12px',
+                                            background: vencido 
+                                                ? 'rgba(244, 63, 94, 0.08)' 
+                                                : pagamento.recebido
+                                                ? 'rgba(34, 197, 94, 0.05)'
+                                                : 'rgba(255, 255, 255, 0.04)',
+                                            border: `1px solid ${vencido 
+                                                ? 'rgba(244, 63, 94, 0.2)' 
+                                                : pagamento.recebido
+                                                ? 'rgba(34, 197, 94, 0.2)'
+                                                : 'rgba(255, 255, 255, 0.08)'}`,
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            flexWrap: 'wrap',
+                                            gap: '1rem',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = vencido 
+                                                ? 'rgba(244, 63, 94, 0.12)' 
+                                                : pagamento.recebido
+                                                ? 'rgba(34, 197, 94, 0.08)'
+                                                : 'rgba(255, 255, 255, 0.06)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = vencido 
+                                                ? 'rgba(244, 63, 94, 0.08)' 
+                                                : pagamento.recebido
+                                                ? 'rgba(34, 197, 94, 0.05)'
+                                                : 'rgba(255, 255, 255, 0.04)';
+                                        }}
+                                    >
+                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                            <div style={{ 
+                                                fontWeight: 600, 
+                                                marginBottom: '0.5rem', 
+                                                color: '#e2e8f0', 
+                                                fontSize: '1.05rem' 
+                                            }}>
+                                                {pagamento.descricao}
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <div style={{ 
-                                                        fontWeight: 700, 
-                                                        color: '#fbbf24', 
-                                                        fontSize: '1.35rem', 
-                                                        marginBottom: '0.25rem',
-                                                        lineHeight: '1.2'
-                                                    }}>
-                                                        {formatarMoeda(pagamento.valor)}
-                                                    </div>
-                                                    <span style={{
-                                                        padding: '0.25rem 0.625rem',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.75rem',
-                                                        background: pagamento.recebido ? 'rgba(34, 197, 94, 0.15)' : 'rgba(244, 63, 94, 0.15)',
-                                                        color: pagamento.recebido ? '#22c55e' : '#f87171',
-                                                        fontWeight: 600
-                                                    }}>
-                                                        {pagamento.recebido ? '✓ Recebido' : 'Pendente'}
+                                            <div style={{ 
+                                                fontSize: '0.85rem', 
+                                                color: 'rgba(226, 232, 240, 0.6)', 
+                                                display: 'flex', 
+                                                gap: '0.75rem', 
+                                                flexWrap: 'wrap' 
+                                            }}>
+                                                <span>{pagamento.alunoId?.userId?.name || 'N/A'}</span>
+                                                <span>•</span>
+                                                <span>Venc: {new Date(pagamento.dataVencimento).toLocaleDateString('pt-BR')}</span>
+                                                {pagamento.recorrente && <span>🔄</span>}
+                                                {vencido && <span style={{ color: '#f87171', fontWeight: 600 }}>⚠️ Vencido</span>}
+                                                {pagamento.recebido && pagamento.dataRecebimento && (
+                                                    <span style={{ color: '#22c55e' }}>
+                                                        Pago em: {new Date(pagamento.dataRecebimento).toLocaleDateString('pt-BR')}
                                                     </span>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    <button
-                                                        onClick={() => abrirFormulario('pagamento', pagamento)}
-                                                        style={{ 
-                                                            padding: '0.5rem',
-                                                            background: 'rgba(59, 130, 246, 0.15)',
-                                                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                                                            borderRadius: '8px',
-                                                            color: '#60a5fa',
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.9rem'
-                                                        }}
-                                                    >
-                                                        ✏️
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete('pagamento', pagamento._id)}
-                                                        style={{
-                                                            padding: '0.5rem',
-                                                            background: 'rgba(244, 63, 94, 0.15)',
-                                                            border: '1px solid rgba(244, 63, 94, 0.3)',
-                                                            borderRadius: '8px',
-                                                            color: '#f87171',
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.9rem'
-                                                        }}
-                                                    >
-                                                        🗑️
-                                                    </button>
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ 
+                                                    fontWeight: 700, 
+                                                    color: pagamento.recebido ? '#22c55e' : '#fbbf24', 
+                                                    fontSize: '1.35rem', 
+                                                    marginBottom: '0.25rem',
+                                                    lineHeight: '1.2'
+                                                }}>
+                                                    {formatarMoeda(pagamento.valor)}
+                                                </div>
+                                                <span style={{
+                                                    padding: '0.25rem 0.625rem',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.75rem',
+                                                    background: pagamento.recebido ? 'rgba(34, 197, 94, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                                                    color: pagamento.recebido ? '#22c55e' : '#f87171',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {pagamento.recebido ? '✓ Pago' : 'Pendente'}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {!pagamento.recebido && (
+                                                    <button
+                                                        onClick={() => marcarComoRecebido(pagamento._id)}
+                                                        style={{ 
+                                                            padding: '0.625rem 1rem',
+                                                            background: 'rgba(34, 197, 94, 0.15)',
+                                                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                            borderRadius: '8px',
+                                                            color: '#22c55e',
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 600,
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.25)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.15)';
+                                                        }}
+                                                    >
+                                                        ✓ Marcar como Pago
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        const receitaFormat = {
+                                                            ...pagamento,
+                                                            categoria: 'mensalidade',
+                                                            data: pagamento.dataVencimento,
+                                                            tipo: 'pagamento'
+                                                        };
+                                                        abrirFormulario('receita', receitaFormat);
+                                                    }}
+                                                    style={{ 
+                                                        padding: '0.5rem',
+                                                        background: 'rgba(59, 130, 246, 0.15)',
+                                                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                        borderRadius: '8px',
+                                                        color: '#60a5fa',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.9rem'
+                                                    }}
+                                                >
+                                                    ✏️
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete('pagamento', pagamento._id)}
+                                                    style={{
+                                                        padding: '0.5rem',
+                                                        background: 'rgba(244, 63, 94, 0.15)',
+                                                        border: '1px solid rgba(244, 63, 94, 0.3)',
+                                                        borderRadius: '8px',
+                                                        color: '#f87171',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.9rem'
+                                                    }}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            };
+
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                    {/* Mensalidades Vencidas */}
+                                    {mensalidadesVencidas.length > 0 && (
+                                        <div>
+                                            <h4 style={{ 
+                                                margin: '0 0 1rem 0', 
+                                                fontSize: '1.1rem', 
+                                                fontWeight: 600, 
+                                                color: '#f87171',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem'
+                                            }}>
+                                                ⚠️ Vencidas ({mensalidadesVencidas.length})
+                                            </h4>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                                {mensalidadesVencidas.map(renderMensalidade)}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Mensalidades Pendentes */}
+                                    {mensalidadesPendentes.length > 0 && (
+                                        <div>
+                                            <h4 style={{ 
+                                                margin: '0 0 1rem 0', 
+                                                fontSize: '1.1rem', 
+                                                fontWeight: 600, 
+                                                color: '#fbbf24',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem'
+                                            }}>
+                                                📅 Pendentes ({mensalidadesPendentes.length})
+                                            </h4>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                                {mensalidadesPendentes.map(renderMensalidade)}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Mensalidades Pagas */}
+                                    {mensalidadesPagas.length > 0 && (
+                                        <div>
+                                            <h4 style={{ 
+                                                margin: '0 0 1rem 0', 
+                                                fontSize: '1.1rem', 
+                                                fontWeight: 600, 
+                                                color: '#22c55e',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem'
+                                            }}>
+                                                ✓ Pagas ({mensalidadesPagas.length})
+                                            </h4>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                                {mensalidadesPagas.map(renderMensalidade)}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}

@@ -118,6 +118,10 @@ router.post('/despesas', authMiddleware, requireRole(['admin', 'professor']), ge
             return res.status(400).json({ message: 'Descrição e valor são obrigatórios' });
         }
 
+        // Se houver dataPagamento, marcar automaticamente como pago
+        const despesaPago = dataPagamento ? true : (pago || false);
+        const despesaDataPagamento = dataPagamento ? new Date(dataPagamento) : (despesaPago ? new Date() : null);
+        
         const despesa = new Despesa({
             academiaId: req.academiaId,
             descricao,
@@ -125,8 +129,8 @@ router.post('/despesas', authMiddleware, requireRole(['admin', 'professor']), ge
             categoria: categoria || 'outros',
             data: data ? new Date(data) : new Date(),
             dataVencimento: dataVencimento ? new Date(dataVencimento) : null,
-            pago: pago || false,
-            dataPagamento: dataPagamento ? new Date(dataPagamento) : (pago ? new Date() : null),
+            pago: despesaPago,
+            dataPagamento: despesaDataPagamento,
             recorrente: recorrente || false,
             frequenciaRecorrencia: frequenciaRecorrencia || 'mensal',
             proximaOcorrencia: proximaOcorrencia ? new Date(proximaOcorrencia) : null,
@@ -281,14 +285,18 @@ router.post('/receitas', authMiddleware, requireRole(['admin', 'professor']), ge
             return res.status(400).json({ message: 'Descrição e valor são obrigatórios' });
         }
 
+        // Se houver dataRecebimento, marcar automaticamente como recebido
+        const receitaRecebido = dataRecebimento ? true : (recebido || false);
+        const receitaDataRecebimento = dataRecebimento ? new Date(dataRecebimento) : (receitaRecebido ? new Date() : null);
+        
         const receita = new Receita({
             academiaId: req.academiaId,
             descricao,
             valor: parseFloat(valor),
             categoria: categoria || 'outros',
             data: data ? new Date(data) : new Date(),
-            dataRecebimento: dataRecebimento ? new Date(dataRecebimento) : null,
-            recebido: recebido || false,
+            dataRecebimento: receitaDataRecebimento,
+            recebido: receitaRecebido,
             alunoId: alunoId || null,
             recorrente: recorrente || false,
             frequenciaRecorrencia: frequenciaRecorrencia || 'mensal',
@@ -523,6 +531,35 @@ router.put('/pagamentos-receber/:id', authMiddleware, requireRole(['admin', 'pro
     } catch (err) {
         console.error('Erro ao atualizar pagamento a receber:', err);
         res.status(500).json({ message: 'Erro ao atualizar pagamento a receber', error: err.message });
+    }
+});
+
+// Marcar pagamento como recebido (rota rápida)
+router.patch('/pagamentos-receber/:id/marcar-recebido', authMiddleware, requireRole(['admin', 'professor']), getAcademiaId, async (req, res) => {
+    try {
+        const pagamento = await PagamentoReceber.findOne({ 
+            _id: req.params.id, 
+            academiaId: req.academiaId 
+        });
+
+        if (!pagamento) {
+            return res.status(404).json({ message: 'Pagamento a receber não encontrado' });
+        }
+
+        pagamento.recebido = true;
+        pagamento.dataRecebimento = new Date();
+        
+        await pagamento.save();
+        await pagamento.populate('criadoPor', 'name email');
+        await pagamento.populate({
+            path: 'alunoId',
+            populate: { path: 'userId', select: 'name email' }
+        });
+
+        res.json({ message: 'Pagamento marcado como recebido com sucesso', pagamento });
+    } catch (err) {
+        console.error('Erro ao marcar pagamento como recebido:', err);
+        res.status(500).json({ message: 'Erro ao marcar pagamento como recebido', error: err.message });
     }
 });
 

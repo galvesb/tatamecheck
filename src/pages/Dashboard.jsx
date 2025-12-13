@@ -122,7 +122,7 @@ const Dashboard = () => {
             { id: 'despesas', name: 'Despesas', icon: '💸' },
             { id: 'cadastro', name: 'Novo', icon: '+' },
             { id: 'receitas', name: 'Receitas', icon: '💰' },
-            { id: 'pagamentos', name: 'A Receber', icon: '📋' }
+            { id: 'pagamentos', name: 'Mensalidades', icon: '📋' }
         ];
     };
 
@@ -293,7 +293,6 @@ const Dashboard = () => {
                         className="btn secondary"
                         style={{
                             width: '100%',
-                            marginBottom: '0.5rem',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.75rem',
@@ -312,29 +311,6 @@ const Dashboard = () => {
                     >
                         <span>💰</span>
                         <span>Nova Receita</span>
-                    </button>
-                    <button
-                        className="btn secondary"
-                        style={{
-                            width: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            justifyContent: 'flex-start',
-                            padding: '12px 16px'
-                        }}
-                        onClick={() => {
-                            setFinanceiroTab('cadastro');
-                            setShowCreateMenu(false);
-                            setTimeout(() => {
-                                if (financeiroCreateRef.current) {
-                                    financeiroCreateRef.current('pagamento');
-                                }
-                            }, 100);
-                        }}
-                    >
-                        <span>📋</span>
-                        <span>Novo Pagamento</span>
                     </button>
                 </div>
             )}
