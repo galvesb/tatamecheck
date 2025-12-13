@@ -7,6 +7,47 @@ const PagamentoReceber = require('../models/PagamentoReceber');
 const Aluno = require('../models/Aluno');
 const Academia = require('../models/Academia');
 
+// Função auxiliar para calcular próxima data baseada na frequência
+const calcularProximaData = (dataAtual, frequencia) => {
+    const novaData = new Date(dataAtual);
+    switch (frequencia) {
+        case 'mensal':
+            novaData.setMonth(novaData.getMonth() + 1);
+            break;
+        case 'trimestral':
+            novaData.setMonth(novaData.getMonth() + 3);
+            break;
+        case 'semestral':
+            novaData.setMonth(novaData.getMonth() + 6);
+            break;
+        case 'anual':
+            novaData.setFullYear(novaData.getFullYear() + 1);
+            break;
+        default:
+            novaData.setMonth(novaData.getMonth() + 1);
+    }
+    return novaData;
+};
+
+// Função auxiliar para gerar todas as ocorrências de uma receita/pagamento recorrente
+const gerarOcorrenciasRecorrentes = (dataInicio, dataFinal, frequencia) => {
+    const ocorrencias = [];
+    // Normalizar datas (remover horas, minutos, segundos)
+    let dataAtual = new Date(dataInicio);
+    dataAtual.setHours(0, 0, 0, 0);
+    
+    const dataFinalDate = new Date(dataFinal);
+    dataFinalDate.setHours(23, 59, 59, 999); // Incluir o dia final completo
+    
+    while (dataAtual <= dataFinalDate) {
+        ocorrencias.push(new Date(dataAtual));
+        dataAtual = calcularProximaData(dataAtual, frequencia);
+        dataAtual.setHours(0, 0, 0, 0); // Normalizar após calcular próxima data
+    }
+    
+    return ocorrencias;
+};
+
 // Middleware para obter academiaId do usuário
 const getAcademiaId = async (req, res, next) => {
     try {
@@ -278,6 +319,8 @@ router.post('/receitas', authMiddleware, requireRole(['admin', 'professor']), ge
             recorrente,
             frequenciaRecorrencia,
             proximaOcorrencia,
+            dataInicio,
+            dataFinal,
             observacoes
         } = req.body;
 
@@ -285,9 +328,96 @@ router.post('/receitas', authMiddleware, requireRole(['admin', 'professor']), ge
             return res.status(400).json({ message: 'Descrição e valor são obrigatórios' });
         }
 
+        console.log('Recebendo requisição de receita:', { 
+            recorrente, 
+            dataInicio, 
+            dataFinal, 
+            frequenciaRecorrencia,
+            temDataInicio: !!dataInicio,
+            temDataFinal: !!dataFinal,
+            bodyCompleto: req.body
+        });
+
+        // Se for recorrente com dataFinal, criar todas as ocorrências
+        // Validar que dataInicio e dataFinal não são strings vazias
+        const dataInicioValida = dataInicio && (typeof dataInicio === 'string' ? dataInicio.trim() !== '' : true);
+        const dataFinalValida = dataFinal && (typeof dataFinal === 'string' ? dataFinal.trim() !== '' : true);
+        
+        console.log('Validação de dados recorrentes:', {
+            recorrente,
+            dataInicioValida,
+            dataFinalValida,
+            dataInicio,
+            dataFinal,
+            tipoDataInicio: typeof dataInicio,
+            tipoDataFinal: typeof dataFinal
+        });
+        
+        if (recorrente && dataInicioValida && dataFinalValida) {
+            const frequencia = frequenciaRecorrencia || 'mensal';
+            console.log('✅ ENTRANDO NO BLOCO DE CRIAÇÃO DE RECEITAS RECORRENTES');
+            console.log('Criando receitas recorrentes:', { dataInicio, dataFinal, frequencia });
+            const ocorrencias = gerarOcorrenciasRecorrentes(dataInicio, dataFinal, frequencia);
+            console.log(`✅ Geradas ${ocorrencias.length} ocorrências:`, ocorrencias.map(d => d.toISOString().split('T')[0]));
+            const receitasCriadas = [];
+            
+            // Tratar alunoId vazio como null (fora do loop)
+            const receitaAlunoId = (alunoId && alunoId.trim() !== '') ? alunoId : null;
+            
+            for (const dataOcorrencia of ocorrencias) {
+                const receitaRecebido = dataRecebimento ? true : (recebido || false);
+                const receitaDataRecebimento = dataRecebimento ? new Date(dataRecebimento) : (receitaRecebido ? new Date() : null);
+                
+                const receita = new Receita({
+                    academiaId: req.academiaId,
+                    descricao,
+                    valor: parseFloat(valor),
+                    categoria: categoria || 'outros',
+                    data: dataOcorrencia,
+                    dataRecebimento: receitaDataRecebimento,
+                    recebido: receitaRecebido,
+                    alunoId: receitaAlunoId,
+                    recorrente: false, // Cada ocorrência individual não é recorrente
+                    frequenciaRecorrencia: frequencia,
+                    proximaOcorrencia: null,
+                    observacoes: observacoes || '',
+                    criadoPor: req.user.userId
+                });
+                
+                await receita.save();
+                await receita.populate('criadoPor', 'name email');
+                if (receita.alunoId) {
+                    await receita.populate({
+                        path: 'alunoId',
+                        populate: { path: 'userId', select: 'name email' }
+                    });
+                }
+                
+                receitasCriadas.push(receita);
+            }
+            
+            console.log(`✅ Total de receitas criadas: ${receitasCriadas.length}`);
+            return res.status(201).json({ 
+                message: `${receitasCriadas.length} receita(s) recorrente(s) criada(s) com sucesso`, 
+                receitas: receitasCriadas,
+                total: receitasCriadas.length
+            });
+        } else {
+            console.log('❌ NÃO entrou no bloco de receitas recorrentes. Motivo:', {
+                recorrente,
+                dataInicioValida,
+                dataFinalValida,
+                dataInicio,
+                dataFinal
+            });
+        }
+
         // Se houver dataRecebimento, marcar automaticamente como recebido
         const receitaRecebido = dataRecebimento ? true : (recebido || false);
         const receitaDataRecebimento = dataRecebimento ? new Date(dataRecebimento) : (receitaRecebido ? new Date() : null);
+        
+        // Tratar alunoId vazio como null
+        const receitaAlunoId = (alunoId && alunoId.trim() !== '') ? alunoId : null;
         
         const receita = new Receita({
             academiaId: req.academiaId,
@@ -297,7 +427,7 @@ router.post('/receitas', authMiddleware, requireRole(['admin', 'professor']), ge
             data: data ? new Date(data) : new Date(),
             dataRecebimento: receitaDataRecebimento,
             recebido: receitaRecebido,
-            alunoId: alunoId || null,
+            alunoId: receitaAlunoId,
             recorrente: recorrente || false,
             frequenciaRecorrencia: frequenciaRecorrencia || 'mensal',
             proximaOcorrencia: proximaOcorrencia ? new Date(proximaOcorrencia) : null,
@@ -324,6 +454,9 @@ router.post('/receitas', authMiddleware, requireRole(['admin', 'professor']), ge
 // Atualizar receita
 router.put('/receitas/:id', authMiddleware, requireRole(['admin', 'professor']), getAcademiaId, async (req, res) => {
     try {
+        // NOTA: Ao atualizar, não criamos múltiplas ocorrências. Isso só acontece na criação (POST).
+        // Se o usuário quiser criar múltiplas ocorrências, deve criar uma nova receita recorrente.
+        
         const receita = await Receita.findOne({ 
             _id: req.params.id, 
             academiaId: req.academiaId 
@@ -343,6 +476,9 @@ router.put('/receitas/:id', authMiddleware, requireRole(['admin', 'professor']),
             if (req.body[campo] !== undefined) {
                 if (campo.includes('data') || campo.includes('Data')) {
                     receita[campo] = req.body[campo] ? new Date(req.body[campo]) : null;
+                } else if (campo === 'alunoId') {
+                    // Tratar string vazia como null para evitar erro de cast no MongoDB
+                    receita[campo] = req.body[campo] && req.body[campo].trim() !== '' ? req.body[campo] : null;
                 } else {
                     receita[campo] = req.body[campo];
                 }
@@ -452,20 +588,71 @@ router.post('/pagamentos-receber', authMiddleware, requireRole(['admin', 'profes
             recorrente,
             frequenciaRecorrencia,
             proximaOcorrencia,
+            dataInicio,
+            dataFinal,
+            dataRecebimento,
+            recebido,
             observacoes
         } = req.body;
 
-        if (!alunoId || !descricao || !valor || !dataVencimento) {
-            return res.status(400).json({ message: 'Aluno, descrição, valor e data de vencimento são obrigatórios' });
+        if (!alunoId || !descricao || !valor || (!dataVencimento && !dataInicio)) {
+            return res.status(400).json({ message: 'Aluno, descrição, valor e data de vencimento/início são obrigatórios' });
         }
 
+        // Se for recorrente com dataFinal, criar todas as ocorrências
+        // Validar que dataInicio e dataFinal não são strings vazias
+        const dataInicioValidaPag = dataInicio && (typeof dataInicio === 'string' ? dataInicio.trim() !== '' : true);
+        const dataFinalValidaPag = dataFinal && (typeof dataFinal === 'string' ? dataFinal.trim() !== '' : true);
+        
+        if (recorrente && dataInicioValidaPag && dataFinalValidaPag) {
+            const frequencia = frequenciaRecorrencia || 'mensal';
+            console.log('Criando pagamentos recorrentes:', { dataInicio, dataFinal, frequencia });
+            const ocorrencias = gerarOcorrenciasRecorrentes(dataInicio, dataFinal, frequencia);
+            console.log(`Geradas ${ocorrencias.length} ocorrências:`, ocorrencias.map(d => d.toISOString().split('T')[0]));
+            const pagamentosCriados = [];
+            
+            for (const dataOcorrencia of ocorrencias) {
+                const pagamento = new PagamentoReceber({
+                    academiaId: req.academiaId,
+                    alunoId,
+                    descricao,
+                    valor: parseFloat(valor),
+                    dataVencimento: dataOcorrencia,
+                    recebido: recebido || false,
+                    dataRecebimento: dataRecebimento ? new Date(dataRecebimento) : null,
+                    recorrente: false, // Cada ocorrência individual não é recorrente
+                    frequenciaRecorrencia: frequencia,
+                    proximaOcorrencia: null,
+                    observacoes: observacoes || '',
+                    criadoPor: req.user.userId
+                });
+                
+                await pagamento.save();
+                await pagamento.populate('criadoPor', 'name email');
+                await pagamento.populate({
+                    path: 'alunoId',
+                    populate: { path: 'userId', select: 'name email' }
+                });
+                
+                pagamentosCriados.push(pagamento);
+            }
+            
+            return res.status(201).json({ 
+                message: `${pagamentosCriados.length} pagamento(s) recorrente(s) criado(s) com sucesso`, 
+                pagamentos: pagamentosCriados,
+                total: pagamentosCriados.length
+            });
+        }
+
+        // Caso contrário, criar apenas um pagamento
         const pagamento = new PagamentoReceber({
             academiaId: req.academiaId,
             alunoId,
             descricao,
             valor: parseFloat(valor),
-            dataVencimento: new Date(dataVencimento),
-            recebido: false,
+            dataVencimento: new Date(dataVencimento || dataInicio),
+            recebido: recebido || false,
+            dataRecebimento: dataRecebimento ? new Date(dataRecebimento) : null,
             recorrente: recorrente || false,
             frequenciaRecorrencia: frequenciaRecorrencia || 'mensal',
             proximaOcorrencia: proximaOcorrencia ? new Date(proximaOcorrencia) : null,
@@ -632,6 +819,19 @@ router.get('/resumo', authMiddleware, requireRole(['admin', 'professor']), getAc
             { $group: { _id: null, total: { $sum: '$valor' } } }
         ]);
 
+        // Receitas não recebidas (pendentes) - devem somar em "A Receber"
+        const filtroReceitasPendentes = { 
+            academiaId: req.academiaId, 
+            recebido: false 
+        };
+        if (dataInicio || dataFim) {
+            filtroReceitasPendentes.data = filtroData;
+        }
+        const totalReceitasPendentes = await Receita.aggregate([
+            { $match: filtroReceitasPendentes },
+            { $group: { _id: null, total: { $sum: '$valor' } } }
+        ]);
+
         // Despesas pendentes
         const filtroDespesasPendentes = { 
             academiaId: req.academiaId, 
@@ -659,11 +859,16 @@ router.get('/resumo', authMiddleware, requireRole(['admin', 'professor']), getAc
             { $sort: { total: -1 } }
         ]);
 
+        // Total "A Receber" = Pagamentos a receber pendentes + Receitas não recebidas
+        const totalAReceber = (totalPagamentosPendentes[0]?.total || 0) + (totalReceitasPendentes[0]?.total || 0);
+
         res.json({
             totalReceitas: totalReceitas[0]?.total || 0,
             totalDespesas: totalDespesas[0]?.total || 0,
             saldo: (totalReceitas[0]?.total || 0) - (totalDespesas[0]?.total || 0),
             totalPagamentosPendentes: totalPagamentosPendentes[0]?.total || 0,
+            totalReceitasPendentes: totalReceitasPendentes[0]?.total || 0,
+            totalAReceber: totalAReceber,
             totalDespesasPendentes: totalDespesasPendentes[0]?.total || 0,
             receitasPorCategoria,
             despesasPorCategoria

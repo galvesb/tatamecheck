@@ -95,9 +95,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         }
     };
 
-    const carregarDespesas = async () => {
+    const carregarDespesas = async (controlarLoading = true) => {
         try {
-            setLoading(true);
+            if (controlarLoading) setLoading(true);
             const params = {};
             if (filtros.dataInicio) params.dataInicio = filtros.dataInicio;
             if (filtros.dataFim) params.dataFim = filtros.dataFim;
@@ -110,13 +110,13 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             console.error('Erro ao carregar despesas:', err);
             setError('Erro ao carregar despesas');
         } finally {
-            setLoading(false);
+            if (controlarLoading) setLoading(false);
         }
     };
 
-    const carregarReceitas = async () => {
+    const carregarReceitas = async (controlarLoading = true) => {
         try {
-            setLoading(true);
+            if (controlarLoading) setLoading(true);
             const params = {};
             if (filtros.dataInicio) params.dataInicio = filtros.dataInicio;
             if (filtros.dataFim) params.dataFim = filtros.dataFim;
@@ -130,13 +130,13 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             console.error('Erro ao carregar receitas:', err);
             setError('Erro ao carregar receitas');
         } finally {
-            setLoading(false);
+            if (controlarLoading) setLoading(false);
         }
     };
 
-    const carregarPagamentosReceber = async () => {
+    const carregarPagamentosReceber = async (controlarLoading = true) => {
         try {
-            setLoading(true);
+            if (controlarLoading) setLoading(true);
             const params = {}; // Todos os pagamentos a receber são mensalidades
             if (filtros.dataInicio) params.dataVencimentoInicio = filtros.dataInicio;
             if (filtros.dataFim) params.dataVencimentoFim = filtros.dataFim;
@@ -149,7 +149,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             console.error('Erro ao carregar mensalidades:', err);
             setError('Erro ao carregar mensalidades');
         } finally {
-            setLoading(false);
+            if (controlarLoading) setLoading(false);
         }
     };
 
@@ -162,7 +162,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             
             // Atualizar resumo sem controlar loading para evitar conflito
             await carregarResumo(false);
-            await carregarPagamentosReceber();
+            await carregarPagamentosReceber(false);
             
             setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
@@ -204,6 +204,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 alunoId: item.alunoId?._id || item.alunoId || '',
                 recorrente: item.recorrente || false,
                 frequenciaRecorrencia: item.frequenciaRecorrencia || 'mensal',
+                dataInicio: item.dataInicio || (item.data ? new Date(item.data).toISOString().split('T')[0] : (item.dataVencimento ? new Date(item.dataVencimento).toISOString().split('T')[0] : '')),
+                dataFinal: item.dataFinal || '',
                 proximaOcorrencia: item.proximaOcorrencia ? new Date(item.proximaOcorrencia).toISOString().split('T')[0] : '',
                 observacoes: item.observacoes || ''
             });
@@ -221,6 +223,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 alunoId: '',
                 recorrente: false,
                 frequenciaRecorrencia: 'mensal',
+                dataInicio: '',
+                dataFinal: '',
                 proximaOcorrencia: '',
                 observacoes: ''
             });
@@ -260,6 +264,34 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 payload.pago = true;
             }
             
+            // Validar campos obrigatórios para recorrentes
+            // Se dataInicio não estiver preenchido explicitamente, usar data ou dataVencimento
+            const dataInicioParaValidacao = payload.dataInicio || payload.data || payload.dataVencimento;
+            const dataInicioValida = dataInicioParaValidacao && 
+                (typeof dataInicioParaValidacao === 'string' ? dataInicioParaValidacao.trim() !== '' : true);
+            const dataFinalValida = payload.dataFinal && 
+                (typeof payload.dataFinal === 'string' ? payload.dataFinal.trim() !== '' : true);
+            
+            // Atualizar payload com dataInicio se não estiver preenchido
+            if (payload.recorrente && !payload.dataInicio && dataInicioParaValidacao) {
+                payload.dataInicio = dataInicioParaValidacao;
+            }
+            
+            if (payload.recorrente && (!dataInicioValida || !dataFinalValida)) {
+                console.log('Erro de validação:', { 
+                    recorrente: payload.recorrente, 
+                    dataInicio: payload.dataInicio, 
+                    dataFinal: payload.dataFinal,
+                    dataInicioParaValidacao,
+                    dataInicioValida,
+                    dataFinalValida,
+                    formData: formData
+                });
+                setError('Para receitas recorrentes, é necessário informar Data Início e Data Final');
+                setLoading(false);
+                return;
+            }
+            
             // Verificar se está editando um pagamento (tem _id e tipo === 'pagamento')
             const isEditingPagamento = editingItem && editingItem._id && editingItem.tipo === 'pagamento';
             
@@ -268,7 +300,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 const pagamentoUrl = isEditingPagamento
                     ? `/api/financeiro/pagamentos-receber/${editingItem._id}`
                     : `/api/financeiro/pagamentos-receber`;
-                await axios[method](pagamentoUrl, {
+                
+                // Preparar dados do pagamento
+                const pagamentoData = {
                     alunoId: payload.alunoId,
                     descricao: payload.descricao,
                     valor: payload.valor,
@@ -277,27 +311,72 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                     recebido: payload.recebido || (payload.dataRecebimento ? true : false),
                     recorrente: payload.recorrente || false,
                     frequenciaRecorrencia: payload.frequenciaRecorrencia || 'mensal',
-                    proximaOcorrencia: payload.proximaOcorrencia,
                     observacoes: payload.observacoes
-                });
+                };
+                
+                // Se for recorrente com dataFinal, incluir dataInicio e dataFinal
+                if (payload.recorrente && payload.dataInicio && payload.dataFinal) {
+                    pagamentoData.dataInicio = payload.dataInicio;
+                    pagamentoData.dataFinal = payload.dataFinal;
+                } else if (payload.proximaOcorrencia) {
+                    pagamentoData.proximaOcorrencia = payload.proximaOcorrencia;
+                }
+                
+                const resPagamento = await axios[method](pagamentoUrl, pagamentoData);
+                
+                // Se for criação recorrente, usar mensagem do backend
+                if (!editingItem && payload.recorrente && payload.dataInicio && payload.dataFinal && resPagamento.data.total) {
+                    setSuccess(resPagamento.data.message || `${resPagamento.data.total} pagamento(s) recorrente(s) criado(s) com sucesso!`);
+                } else {
+                    const tipoCriado = 'pagamento a receber';
+                    setSuccess(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`);
+                }
             } else {
                 // Criar como receita normal
                 const url = editingItem 
                     ? `/api/financeiro/${formType}s/${editingItem._id}`
                     : `/api/financeiro/${formType}s`;
-                await axios[method](url, payload);
+                    
+                // Se for recorrente, garantir que dataInicio e dataFinal estão no payload
+                if (formType === 'receita' && payload.recorrente) {
+                    // Se dataInicio não estiver preenchido explicitamente, usar data ou dataVencimento
+                    if (!payload.dataInicio || (typeof payload.dataInicio === 'string' && payload.dataInicio.trim() === '')) {
+                        payload.dataInicio = payload.data || payload.dataVencimento || new Date().toISOString().split('T')[0];
+                    }
+                    // Garantir que dataFinal está presente
+                    if (!payload.dataFinal || (typeof payload.dataFinal === 'string' && payload.dataFinal.trim() === '')) {
+                        // Se dataFinal não estiver preenchido, não podemos criar receitas recorrentes
+                        console.warn('⚠️ Receita recorrente sem dataFinal definida');
+                    }
+                    payload.data = payload.dataInicio; // Usar dataInicio como data base também
+                    console.log('📤 Enviando receita recorrente:', { 
+                        recorrente: payload.recorrente, 
+                        dataInicio: payload.dataInicio, 
+                        dataFinal: payload.dataFinal,
+                        frequencia: payload.frequenciaRecorrencia,
+                        payloadCompleto: JSON.stringify(payload, null, 2)
+                    });
+                }
+                
+                const resReceita = await axios[method](url, payload);
+                
+                // Se for criação recorrente, usar mensagem do backend
+                if (!editingItem && payload.recorrente && payload.dataInicio && payload.dataFinal && resReceita.data.total) {
+                    setSuccess(resReceita.data.message || `${resReceita.data.total} receita(s) recorrente(s) criada(s) com sucesso!`);
+                } else {
+                    const tipoCriado = formType;
+                    setSuccess(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`);
+                }
             }
-            
-            const tipoCriado = (formType === 'receita' && payload.alunoId && payload.dataVencimento) ? 'pagamento a receber' : formType;
-            setSuccess(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`);
             fecharFormulario();
             
             // Atualizar tudo em paralelo para garantir que está tudo atualizado
+            // Sempre atualizar o resumo e todas as listas, independente da aba ativa
             await Promise.all([
                 carregarResumo(false),
-                activeTab === 'despesas' ? carregarDespesas() : Promise.resolve(),
-                activeTab === 'receitas' ? Promise.all([carregarReceitas(), carregarPagamentosReceber()]) : Promise.resolve(),
-                activeTab === 'pagamentos' ? carregarPagamentosReceber() : Promise.resolve()
+                carregarDespesas(false),
+                carregarReceitas(false),
+                carregarPagamentosReceber(false)
             ]);
             
             setLoading(false);
@@ -322,11 +401,12 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             setSuccess(`${tipo} deletado com sucesso!`);
             
             // Atualizar tudo em paralelo para garantir que está tudo atualizado
+            // Sempre atualizar o resumo, independente da aba ativa
             await Promise.all([
                 carregarResumo(false),
-                activeTab === 'despesas' ? carregarDespesas() : Promise.resolve(),
-                activeTab === 'receitas' ? carregarReceitas() : Promise.resolve(),
-                activeTab === 'pagamentos' ? carregarPagamentosReceber() : Promise.resolve()
+                carregarDespesas(false),
+                carregarReceitas(false),
+                carregarPagamentosReceber(false)
             ]);
             
             setLoading(false);
@@ -705,7 +785,18 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         <input
                             type="checkbox"
                             checked={formData.recorrente || false}
-                            onChange={(e) => setFormData({ ...formData, recorrente: e.target.checked })}
+                            onChange={(e) => {
+                                const isRecorrente = e.target.checked;
+                                // Se marcar como recorrente e dataInicio estiver vazio, preencher com data/dataVencimento
+                                const novoDataInicio = (!formData.dataInicio || formData.dataInicio.trim() === '') && isRecorrente
+                                    ? (formData.data || formData.dataVencimento || new Date().toISOString().split('T')[0])
+                                    : formData.dataInicio;
+                                setFormData({ 
+                                    ...formData, 
+                                    recorrente: isRecorrente,
+                                    dataInicio: novoDataInicio
+                                });
+                            }}
                             style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                         />
                         <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Recorrente</label>
@@ -736,25 +827,69 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     <option value="anual">Anual</option>
                                 </select>
                             </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
-                                    Próxima Ocorrência
-                                </label>
-                                <input
-                                    type="date"
-                                    value={formData.proximaOcorrencia || ''}
-                                    onChange={(e) => setFormData({ ...formData, proximaOcorrencia: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.875rem',
-                                        borderRadius: '10px',
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                                        color: '#fff',
-                                        fontSize: '0.95rem'
-                                    }}
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data Início *
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dataInicio || (formData.data || formData.dataVencimento || '')}
+                                        onChange={(e) => {
+                                            const dataInicio = e.target.value;
+                                            setFormData({ 
+                                                ...formData, 
+                                                dataInicio: dataInicio || '', // Garantir que sempre salve no formData, mesmo se vazio
+                                                // Atualizar também data/dataVencimento se não estiverem preenchidas
+                                                data: formData.data || dataInicio,
+                                                dataVencimento: formData.dataVencimento || dataInicio
+                                            });
+                                        }}
+                                        required={formData.recorrente}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.625rem', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500, fontSize: '0.95rem' }}>
+                                        Data Final *
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dataFinal || ''}
+                                        onChange={(e) => setFormData({ ...formData, dataFinal: e.target.value })}
+                                        required={formData.recorrente}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#fff',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    />
+                                </div>
                             </div>
+                            {formData.dataInicio && formData.dataFinal && (
+                                <div style={{
+                                    padding: '0.75rem',
+                                    borderRadius: '8px',
+                                    background: 'rgba(59, 130, 246, 0.1)',
+                                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                                    color: '#60a5fa',
+                                    fontSize: '0.85rem'
+                                }}>
+                                    💡 Serão criadas automaticamente todas as ocorrências de {formData.frequenciaRecorrencia} de {new Date(formData.dataInicio).toLocaleDateString('pt-BR')} até {new Date(formData.dataFinal).toLocaleDateString('pt-BR')}.
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -1041,7 +1176,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                         color: '#fbbf24',
                                         lineHeight: '1.2'
                                     }}>
-                                        {formatarMoeda(resumo.totalPagamentosPendentes)}
+                                        {formatarMoeda(resumo.totalAReceber || (resumo.totalPagamentosPendentes || 0) + (resumo.totalReceitasPendentes || 0))}
                                     </div>
                                 </div>
                             </div>
