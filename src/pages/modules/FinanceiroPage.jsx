@@ -765,7 +765,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     type="checkbox"
                                     checked={formData.pago || false}
                                     onChange={(e) => setFormData({ ...formData, pago: e.target.checked, dataPagamento: e.target.checked ? (formData.dataPagamento || new Date().toISOString().split('T')[0]) : '' })}
-                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#3b82f6' }}
                                 />
                                 <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como pago</label>
                             </div>
@@ -897,7 +897,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     type="checkbox"
                                     checked={formData.recebido || false}
                                     onChange={(e) => setFormData({ ...formData, recebido: e.target.checked, dataRecebimento: e.target.checked ? (formData.dataRecebimento || new Date().toISOString().split('T')[0]) : '' })}
-                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#3b82f6' }}
                                 />
                                 <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Marcar como recebido</label>
                             </div>
@@ -1953,7 +1953,12 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                                 deselecionarTodasReceitas();
                                             }
                                         }}
-                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                        style={{ 
+                                            width: '18px', 
+                                            height: '18px', 
+                                            cursor: 'pointer',
+                                            accentColor: '#3b82f6'
+                                        }}
                                     />
                                     <label style={{ 
                                         color: 'rgba(226, 232, 240, 0.7)', 
@@ -2007,7 +2012,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                                         width: '18px', 
                                                         height: '18px', 
                                                         cursor: 'pointer',
-                                                        flexShrink: 0
+                                                        flexShrink: 0,
+                                                        accentColor: '#3b82f6'
                                                     }}
                                                 />
                                                 <div style={{ flex: 1 }}>
