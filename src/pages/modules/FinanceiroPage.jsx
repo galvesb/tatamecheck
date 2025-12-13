@@ -449,6 +449,11 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         });
     };
 
+    // Verificar se há algum filtro ativo
+    const temFiltrosAtivos = () => {
+        return !!(filtros.dataInicio || filtros.dataFim || filtros.categoria || filtros.status || filtros.alunoId);
+    };
+
     const formatarMoeda = (valor) => {
         return new Intl.NumberFormat('pt-BR', {
             style: 'currency',
@@ -1272,15 +1277,17 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                                 }}
                                             />
                                         </div>
-                                        <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
-                                            <button 
-                                                className="btn secondary" 
-                                                onClick={limparFiltros} 
-                                                style={{ width: '100%', padding: '0.75rem' }}
-                                            >
-                                                Limpar Filtros
-                                            </button>
-                                        </div>
+                                        {temFiltrosAtivos() && (
+                                            <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
+                                                <button 
+                                                    className="btn secondary" 
+                                                    onClick={limparFiltros} 
+                                                    style={{ width: '100%', padding: '0.75rem' }}
+                                                >
+                                                    Limpar Filtros
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1413,6 +1420,33 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     <option value="pendente">Pendente</option>
                                 </select>
                             </div>
+                            {temFiltrosAtivos() && (
+                                <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
+                                    <button 
+                                        onClick={limparFiltros}
+                                        style={{ 
+                                            width: '100%', 
+                                            padding: '0.75rem',
+                                            borderRadius: '8px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#e2e8f0',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 500,
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                        }}
+                                    >
+                                        🗑️ Limpar Filtros
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {loading ? (
@@ -1661,6 +1695,33 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     ))}
                                 </select>
                             </div>
+                            {temFiltrosAtivos() && (
+                                <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
+                                    <button 
+                                        onClick={limparFiltros}
+                                        style={{ 
+                                            width: '100%', 
+                                            padding: '0.75rem',
+                                            borderRadius: '8px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#e2e8f0',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 500,
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                        }}
+                                    >
+                                        🗑️ Limpar Filtros
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {loading ? (
@@ -1902,6 +1963,33 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     ))}
                                 </select>
                             </div>
+                            {temFiltrosAtivos() && (
+                                <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
+                                    <button 
+                                        onClick={limparFiltros}
+                                        style={{ 
+                                            width: '100%', 
+                                            padding: '0.75rem',
+                                            borderRadius: '8px',
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            color: '#e2e8f0',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 500,
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                        }}
+                                    >
+                                        🗑️ Limpar Filtros
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {loading ? (
