@@ -506,6 +506,37 @@ router.put('/receitas/:id', authMiddleware, requireRole(['admin', 'professor']),
     }
 });
 
+// Marcar receita como recebida (rota rápida)
+router.patch('/receitas/:id/marcar-recebido', authMiddleware, requireRole(['admin', 'professor']), getAcademiaId, async (req, res) => {
+    try {
+        const receita = await Receita.findOne({ 
+            _id: req.params.id, 
+            academiaId: req.academiaId 
+        });
+
+        if (!receita) {
+            return res.status(404).json({ message: 'Receita não encontrada' });
+        }
+
+        receita.recebido = true;
+        receita.dataRecebimento = new Date();
+        
+        await receita.save();
+        await receita.populate('criadoPor', 'name email');
+        if (receita.alunoId) {
+            await receita.populate({
+                path: 'alunoId',
+                populate: { path: 'userId', select: 'name email' }
+            });
+        }
+
+        res.json({ message: 'Receita marcada como recebida com sucesso', receita });
+    } catch (err) {
+        console.error('Erro ao marcar receita como recebida:', err);
+        res.status(500).json({ message: 'Erro ao marcar receita como recebida', error: err.message });
+    }
+});
+
 // Deletar receita
 router.delete('/receitas/:id', authMiddleware, requireRole(['admin', 'professor']), getAcademiaId, async (req, res) => {
     try {

@@ -173,6 +173,28 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         }
     };
 
+    const marcarReceitaComoRecebida = async (receitaId) => {
+        try {
+            setLoading(true);
+            const res = await axios.patch(`/api/financeiro/receitas/${receitaId}/marcar-recebido`);
+            setSuccess('Receita marcada como recebida com sucesso!');
+            setLoading(false);
+            
+            // Atualizar resumo e receitas sem controlar loading para evitar conflito
+            await Promise.all([
+                carregarResumo(false),
+                carregarReceitas(false)
+            ]);
+            
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error('Erro ao marcar receita como recebida:', err);
+            setError('Erro ao marcar receita como recebida');
+            setLoading(false);
+            setTimeout(() => setError(null), 3000);
+        }
+    };
+
     const abrirFormulario = (tipo, item = null) => {
         setFormType(tipo);
         setEditingItem(item);
@@ -1721,6 +1743,23 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                                 </span>
                                             </div>
                                             <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {!receita.recebido && (
+                                                    <button
+                                                        onClick={() => marcarReceitaComoRecebida(receita._id)}
+                                                        style={{ 
+                                                            padding: '0.5rem',
+                                                            background: 'rgba(34, 197, 94, 0.15)',
+                                                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                            borderRadius: '8px',
+                                                            color: '#22c55e',
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.9rem'
+                                                        }}
+                                                        title="Marcar como recebida"
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => abrirFormulario('receita', receita)}
                                                     style={{ 
