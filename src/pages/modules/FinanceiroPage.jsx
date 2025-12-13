@@ -37,6 +37,12 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         alunoId: ''
     });
     const [showFiltros, setShowFiltros] = useState(false);
+    
+    // Estados para seleção múltipla de receitas
+    const [receitasSelecionadas, setReceitasSelecionadas] = useState([]);
+    const [showBulkActions, setShowBulkActions] = useState(false);
+    const [bulkActionModal, setBulkActionModal] = useState(null); // 'marcar-recebido', 'deletar', 'alterar-valor'
+    const [novoValorBulk, setNovoValorBulk] = useState('');
 
     useEffect(() => {
         if (user && (user.role === 'admin' || user.role === 'professor')) {
@@ -192,6 +198,135 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             setError('Erro ao marcar receita como recebida');
             setLoading(false);
             setTimeout(() => setError(null), 3000);
+        }
+    };
+
+    // Funções de seleção múltipla
+    const toggleSelecionarReceita = (receitaId) => {
+        setReceitasSelecionadas(prev => {
+            if (prev.includes(receitaId)) {
+                const novas = prev.filter(id => id !== receitaId);
+                setShowBulkActions(novas.length > 0);
+                return novas;
+            } else {
+                const novas = [...prev, receitaId];
+                setShowBulkActions(novas.length > 0);
+                return novas;
+            }
+        });
+    };
+
+    const selecionarTodasReceitas = () => {
+        const todasIds = receitas.map(r => r._id);
+        setReceitasSelecionadas(todasIds);
+        setShowBulkActions(true);
+    };
+
+    const deselecionarTodasReceitas = () => {
+        setReceitasSelecionadas([]);
+        setShowBulkActions(false);
+    };
+
+    // Ações em massa
+    const marcarReceitasComoRecebidas = async () => {
+        if (receitasSelecionadas.length === 0) return;
+        
+        try {
+            setLoading(true);
+            await Promise.all(
+                receitasSelecionadas.map(id => 
+                    axios.patch(`/api/financeiro/receitas/${id}/marcar-recebido`)
+                )
+            );
+            setSuccess(`${receitasSelecionadas.length} receita(s) marcada(s) como recebida(s)!`);
+            setReceitasSelecionadas([]);
+            setShowBulkActions(false);
+            setBulkActionModal(null);
+            
+            await Promise.all([
+                carregarResumo(false),
+                carregarReceitas(false)
+            ]);
+            
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error('Erro ao marcar receitas como recebidas:', err);
+            setError('Erro ao marcar receitas como recebidas');
+            setTimeout(() => setError(null), 3000);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deletarReceitasSelecionadas = async () => {
+        if (receitasSelecionadas.length === 0) return;
+        
+        if (!window.confirm(`Tem certeza que deseja deletar ${receitasSelecionadas.length} receita(s)?`)) {
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            await Promise.all(
+                receitasSelecionadas.map(id => 
+                    axios.delete(`/api/financeiro/receitas/${id}`)
+                )
+            );
+            setSuccess(`${receitasSelecionadas.length} receita(s) deletada(s) com sucesso!`);
+            setReceitasSelecionadas([]);
+            setShowBulkActions(false);
+            setBulkActionModal(null);
+            
+            await Promise.all([
+                carregarResumo(false),
+                carregarReceitas(false)
+            ]);
+            
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error('Erro ao deletar receitas:', err);
+            setError('Erro ao deletar receitas');
+            setTimeout(() => setError(null), 3000);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const alterarValorReceitas = async () => {
+        if (receitasSelecionadas.length === 0 || !novoValorBulk) return;
+        
+        const novoValor = parseFloat(novoValorBulk);
+        if (isNaN(novoValor) || novoValor <= 0) {
+            setError('Valor inválido');
+            setTimeout(() => setError(null), 3000);
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            await Promise.all(
+                receitasSelecionadas.map(id => 
+                    axios.put(`/api/financeiro/receitas/${id}`, { valor: novoValor })
+                )
+            );
+            setSuccess(`Valor de ${receitasSelecionadas.length} receita(s) alterado(s) para ${formatarMoeda(novoValor)}!`);
+            setReceitasSelecionadas([]);
+            setShowBulkActions(false);
+            setBulkActionModal(null);
+            setNovoValorBulk('');
+            
+            await Promise.all([
+                carregarResumo(false),
+                carregarReceitas(false)
+            ]);
+            
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error('Erro ao alterar valor das receitas:', err);
+            setError('Erro ao alterar valor das receitas');
+            setTimeout(() => setError(null), 3000);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -1713,31 +1848,169 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                 <p style={{ fontSize: '0.95rem' }}>Nenhuma receita encontrada</p>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {receitas.map(receita => (
-                                    <div
-                                        key={receita._id}
-                                        style={{
-                                            padding: '1.25rem',
-                                            borderRadius: '12px',
-                                            background: 'rgba(255, 255, 255, 0.04)',
-                                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            flexWrap: 'wrap',
-                                            gap: '1rem',
-                                            transition: 'all 0.2s',
-                                            cursor: 'pointer'
+                            <>
+                                {/* Barra de ações em massa */}
+                                {showBulkActions && (
+                                    <div style={{
+                                        padding: '1rem',
+                                        borderRadius: '12px',
+                                        background: 'rgba(59, 130, 246, 0.1)',
+                                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                                        marginBottom: '1rem',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap',
+                                        gap: '1rem'
+                                    }}>
+                                        <div style={{ 
+                                            color: '#60a5fa', 
+                                            fontWeight: 600,
+                                            fontSize: '0.95rem'
+                                        }}>
+                                            {receitasSelecionadas.length} receita(s) selecionada(s)
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                            <button
+                                                onClick={() => setBulkActionModal('marcar-recebido')}
+                                                style={{
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(34, 197, 94, 0.15)',
+                                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                    color: '#22c55e',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 500
+                                                }}
+                                            >
+                                                ✓ Marcar como Recebido
+                                            </button>
+                                            <button
+                                                onClick={() => setBulkActionModal('alterar-valor')}
+                                                style={{
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(251, 191, 36, 0.15)',
+                                                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                                                    color: '#fbbf24',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 500
+                                                }}
+                                            >
+                                                💰 Alterar Valor
+                                            </button>
+                                            <button
+                                                onClick={() => setBulkActionModal('deletar')}
+                                                style={{
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(244, 63, 94, 0.15)',
+                                                    border: '1px solid rgba(244, 63, 94, 0.3)',
+                                                    color: '#f87171',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 500
+                                                }}
+                                            >
+                                                🗑️ Deletar
+                                            </button>
+                                            <button
+                                                onClick={deselecionarTodasReceitas}
+                                                style={{
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                    color: '#e2e8f0',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 500
+                                                }}
+                                            >
+                                                ✕ Cancelar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Checkbox selecionar todas */}
+                                <div style={{
+                                    padding: '0.75rem',
+                                    marginBottom: '0.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={receitasSelecionadas.length === receitas.length && receitas.length > 0}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                selecionarTodasReceitas();
+                                            } else {
+                                                deselecionarTodasReceitas();
+                                            }
                                         }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                                        }}
-                                    >
-                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                    />
+                                    <label style={{ 
+                                        color: 'rgba(226, 232, 240, 0.7)', 
+                                        cursor: 'pointer',
+                                        fontSize: '0.9rem'
+                                    }}>
+                                        Selecionar todas ({receitas.length})
+                                    </label>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {receitas.map(receita => (
+                                        <div
+                                            key={receita._id}
+                                            style={{
+                                                padding: '1.25rem',
+                                                borderRadius: '12px',
+                                                background: receitasSelecionadas.includes(receita._id) 
+                                                    ? 'rgba(59, 130, 246, 0.1)' 
+                                                    : 'rgba(255, 255, 255, 0.04)',
+                                                border: receitasSelecionadas.includes(receita._id)
+                                                    ? '1px solid rgba(59, 130, 246, 0.3)'
+                                                    : '1px solid rgba(255, 255, 255, 0.08)',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                flexWrap: 'wrap',
+                                                gap: '1rem',
+                                                transition: 'all 0.2s',
+                                                cursor: 'default'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!receitasSelecionadas.includes(receita._id)) {
+                                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!receitasSelecionadas.includes(receita._id)) {
+                                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                                                }
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '200px' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={receitasSelecionadas.includes(receita._id)}
+                                                    onChange={() => {
+                                                        toggleSelecionarReceita(receita._id);
+                                                    }}
+                                                    style={{ 
+                                                        width: '18px', 
+                                                        height: '18px', 
+                                                        cursor: 'pointer',
+                                                        flexShrink: 0
+                                                    }}
+                                                />
+                                                <div style={{ flex: 1 }}>
                                             <div style={{ 
                                                 fontWeight: 600, 
                                                 marginBottom: '0.5rem', 
@@ -1758,6 +2031,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                                 <span style={{ textTransform: 'capitalize' }}>{receita.categoria}</span>
                                                 {receita.alunoId?.userId?.name && <span>• {receita.alunoId.userId.name}</span>}
                                                 {receita.recorrente && <span>🔄</span>}
+                                            </div>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -1782,7 +2056,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                                     {receita.recebido ? '✓ Recebido' : 'Pendente'}
                                                 </span>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
                                                 {!receita.recebido && (
                                                     <button
                                                         onClick={() => marcarReceitaComoRecebida(receita._id)}
@@ -1832,7 +2106,227 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                         </div>
                                     </div>
                                 ))}
-                            </div>
+                                </div>
+
+                                {/* Modal de ações em massa */}
+                                {bulkActionModal === 'marcar-recebido' && (
+                                <div style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: 'rgba(0, 0, 0, 0.7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1000
+                                }}>
+                                    <div style={{
+                                        background: 'rgba(30, 41, 59, 0.95)',
+                                        padding: '2rem',
+                                        borderRadius: '16px',
+                                        maxWidth: '400px',
+                                        width: '90%',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                        <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#e2e8f0' }}>
+                                            Marcar como Recebido
+                                        </h3>
+                                        <p style={{ color: 'rgba(226, 232, 240, 0.7)', marginBottom: '1.5rem' }}>
+                                            Deseja marcar {receitasSelecionadas.length} receita(s) como recebida(s)?
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setBulkActionModal(null);
+                                                    deselecionarTodasReceitas();
+                                                }}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                    color: '#e2e8f0',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                onClick={marcarReceitasComoRecebidas}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(34, 197, 94, 0.15)',
+                                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                    color: '#22c55e',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Confirmar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+
+                                {bulkActionModal === 'deletar' && (
+                                <div style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: 'rgba(0, 0, 0, 0.7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1000
+                                }}>
+                                    <div style={{
+                                        background: 'rgba(30, 41, 59, 0.95)',
+                                        padding: '2rem',
+                                        borderRadius: '16px',
+                                        maxWidth: '400px',
+                                        width: '90%',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                        <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#e2e8f0' }}>
+                                            Deletar Receitas
+                                        </h3>
+                                        <p style={{ color: 'rgba(226, 232, 240, 0.7)', marginBottom: '1.5rem' }}>
+                                            Tem certeza que deseja deletar {receitasSelecionadas.length} receita(s)? Esta ação não pode ser desfeita.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setBulkActionModal(null);
+                                                    deselecionarTodasReceitas();
+                                                }}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                    color: '#e2e8f0',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                onClick={deletarReceitasSelecionadas}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(244, 63, 94, 0.15)',
+                                                    border: '1px solid rgba(244, 63, 94, 0.3)',
+                                                    color: '#f87171',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Deletar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+
+                                {bulkActionModal === 'alterar-valor' && (
+                                <div style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: 'rgba(0, 0, 0, 0.7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1000
+                                }}>
+                                    <div style={{
+                                        background: 'rgba(30, 41, 59, 0.95)',
+                                        padding: '2rem',
+                                        borderRadius: '16px',
+                                        maxWidth: '400px',
+                                        width: '90%',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                        <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#e2e8f0' }}>
+                                            Alterar Valor
+                                        </h3>
+                                        <p style={{ color: 'rgba(226, 232, 240, 0.7)', marginBottom: '1rem' }}>
+                                            Novo valor para {receitasSelecionadas.length} receita(s):
+                                        </p>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0.01"
+                                            value={novoValorBulk}
+                                            onChange={(e) => setNovoValorBulk(e.target.value)}
+                                            placeholder="0.00"
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.875rem',
+                                                borderRadius: '8px',
+                                                background: 'rgba(255, 255, 255, 0.08)',
+                                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                color: '#fff',
+                                                fontSize: '1rem',
+                                                marginBottom: '1.5rem'
+                                            }}
+                                        />
+                                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setBulkActionModal(null);
+                                                    setNovoValorBulk('');
+                                                }}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                    color: '#e2e8f0',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                onClick={alterarValorReceitas}
+                                                disabled={!novoValorBulk || parseFloat(novoValorBulk) <= 0}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    borderRadius: '8px',
+                                                    background: (!novoValorBulk || parseFloat(novoValorBulk) <= 0)
+                                                        ? 'rgba(255, 255, 255, 0.05)'
+                                                        : 'rgba(251, 191, 36, 0.15)',
+                                                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                                                    color: (!novoValorBulk || parseFloat(novoValorBulk) <= 0)
+                                                        ? 'rgba(226, 232, 240, 0.3)'
+                                                        : '#fbbf24',
+                                                    cursor: (!novoValorBulk || parseFloat(novoValorBulk) <= 0) ? 'not-allowed' : 'pointer',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Confirmar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
