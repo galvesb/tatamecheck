@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import CheckInMap from '../../components/CheckInMap';
 import '../../index.css';
@@ -8,6 +8,31 @@ const PresencaPage = () => {
     const [checkInStatus, setCheckInStatus] = useState(null);
     const [showMap, setShowMap] = useState(false);
     const [mapKey, setMapKey] = useState(0);
+    const [toast, setToast] = useState(null);
+    const toastTimerRef = useRef(null);
+
+    // Função para mostrar toast
+    const showToast = (message, type = 'success') => {
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current);
+        }
+        
+        setToast({ message, type });
+        
+        toastTimerRef.current = setTimeout(() => {
+            setToast(null);
+            toastTimerRef.current = null;
+        }, 2000);
+    };
+
+    // Cleanup do timer ao desmontar
+    useEffect(() => {
+        return () => {
+            if (toastTimerRef.current) {
+                clearTimeout(toastTimerRef.current);
+            }
+        };
+    }, []);
 
     // Se não for aluno, mostrar painel de professor/admin
     if (user?.role !== 'aluno') {
@@ -33,11 +58,15 @@ const PresencaPage = () => {
     };
 
     const handleCheckInSuccess = (data) => {
-        setCheckInStatus({ 
-            success: true, 
-            message: data.message,
-            progresso: data.progresso
-        });
+        // Mostrar toast de sucesso
+        let message = data.message || 'Check-in realizado com sucesso!';
+        if (data.progresso) {
+            message += ` Progresso: ${data.progresso.diasPresenca}/${data.progresso.diasNecessarios} dias`;
+            if (data.progresso.diasRestantes > 0) {
+                message += ` • Faltam ${data.progresso.diasRestantes} dias`;
+            }
+        }
+        showToast(message, 'success');
         setShowMap(false);
     };
 
@@ -51,6 +80,15 @@ const PresencaPage = () => {
 
     return (
         <div>
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`toast-notification ${toast.type} show`}>
+                    <div className="toast-content">
+                        <span>{toast.message}</span>
+                    </div>
+                </div>
+            )}
+
             {/* Modal do Mapa */}
             {showMap && (
                 <div style={{
@@ -95,28 +133,6 @@ const PresencaPage = () => {
                     >
                         📍 Fazer Check-in
                     </button>
-                    {checkInStatus && (
-                        <div style={{
-                            marginTop: '1rem',
-                            padding: '12px',
-                            borderRadius: '12px',
-                            background: checkInStatus.success 
-                                ? 'rgba(34, 197, 94, 0.15)' 
-                                : 'rgba(244, 63, 94, 0.15)',
-                            color: checkInStatus.success ? '#22c55e' : '#f87171',
-                            border: `1px solid ${checkInStatus.success ? 'rgba(34, 197, 94, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`
-                        }}>
-                            {checkInStatus.message}
-                            {checkInStatus.progresso && (
-                                <div style={{ marginTop: '8px', fontSize: '0.9rem' }}>
-                                    Progresso: {checkInStatus.progresso.diasPresenca}/{checkInStatus.progresso.diasNecessarios} dias
-                                    {checkInStatus.progresso.diasRestantes > 0 && (
-                                        <span> • Faltam {checkInStatus.progresso.diasRestantes} dias</span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
             )}
 

@@ -12,9 +12,12 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
     const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab;
     const setActiveTab = onTabChange || setInternalActiveTab;
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(null);
+    const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
+    const toastTimerRef = React.useRef(null);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    
+    // Estado para modal de confirmação
+    const [confirmModal, setConfirmModal] = useState(null); // { message: string, onConfirm: function }
     
     // Estados para dados
     const [resumo, setResumo] = useState(null);
@@ -60,6 +63,31 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Função para mostrar toast
+    const showToast = (message, type = 'success') => {
+        // Limpa timer anterior se existir
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current);
+        }
+        
+        setToast({ message, type });
+        
+        // Remove o toast após 2 segundos
+        toastTimerRef.current = setTimeout(() => {
+            setToast(null);
+            toastTimerRef.current = null;
+        }, 2000);
+    };
+
+    // Cleanup do timer ao desmontar
+    useEffect(() => {
+        return () => {
+            if (toastTimerRef.current) {
+                clearTimeout(toastTimerRef.current);
+            }
+        };
+    }, []);
+
     useEffect(() => {
         if (activeTab === 'despesas') {
             carregarDespesas();
@@ -90,13 +118,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             
             const res = await axios.get('/api/financeiro/resumo', { params });
             setResumo(res.data);
-            // Limpar erro se houver sucesso
-            if (error && error.includes('resumo')) {
-                setError(null);
-            }
         } catch (err) {
             console.error('Erro ao carregar resumo:', err);
-            setError('Erro ao carregar resumo financeiro');
+            showToast('Erro ao carregar resumo financeiro', 'error');
         } finally {
             if (controlarLoading) setLoading(false);
         }
@@ -115,7 +139,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             setDespesas(res.data.despesas || []);
         } catch (err) {
             console.error('Erro ao carregar despesas:', err);
-            setError('Erro ao carregar despesas');
+            showToast('Erro ao carregar despesas', 'error');
         } finally {
             if (controlarLoading) setLoading(false);
         }
@@ -135,7 +159,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             setReceitas(res.data.receitas || []);
         } catch (err) {
             console.error('Erro ao carregar receitas:', err);
-            setError('Erro ao carregar receitas');
+            showToast('Erro ao carregar receitas', 'error');
         } finally {
             if (controlarLoading) setLoading(false);
         }
@@ -154,7 +178,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             setPagamentosReceber(res.data.pagamentos || []);
         } catch (err) {
             console.error('Erro ao carregar mensalidades:', err);
-            setError('Erro ao carregar mensalidades');
+            showToast('Erro ao carregar mensalidades', 'error');
         } finally {
             if (controlarLoading) setLoading(false);
         }
@@ -164,19 +188,16 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         try {
             setLoading(true);
             const res = await axios.patch(`/api/financeiro/pagamentos-receber/${pagamentoId}/marcar-recebido`);
-            setSuccess('Mensalidade marcada como recebida com sucesso!');
+            showToast('Mensalidade marcada como recebida com sucesso!', 'success');
             setLoading(false);
             
             // Atualizar resumo sem controlar loading para evitar conflito
             await carregarResumo(false);
             await carregarPagamentosReceber(false);
-            
-            setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
             console.error('Erro ao marcar como recebido:', err);
-            setError('Erro ao marcar mensalidade como recebida');
+            showToast('Erro ao marcar mensalidade como recebida', 'error');
             setLoading(false);
-            setTimeout(() => setError(null), 3000);
         }
     };
 
@@ -184,7 +205,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         try {
             setLoading(true);
             const res = await axios.patch(`/api/financeiro/receitas/${receitaId}/marcar-recebido`);
-            setSuccess('Receita marcada como recebida com sucesso!');
+            showToast('Receita marcada como recebida com sucesso!', 'success');
             setLoading(false);
             
             // Atualizar resumo e receitas sem controlar loading para evitar conflito
@@ -192,13 +213,10 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 carregarResumo(false),
                 carregarReceitas(false)
             ]);
-            
-            setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
             console.error('Erro ao marcar receita como recebida:', err);
-            setError('Erro ao marcar receita como recebida');
+            showToast('Erro ao marcar receita como recebida', 'error');
             setLoading(false);
-            setTimeout(() => setError(null), 3000);
         }
     };
 
@@ -239,7 +257,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                     axios.patch(`/api/financeiro/receitas/${id}/marcar-recebido`)
                 )
             );
-            setSuccess(`${receitasSelecionadas.length} receita(s) marcada(s) como recebida(s)!`);
+            showToast(`${receitasSelecionadas.length} receita(s) marcada(s) como recebida(s)!`, 'success');
             setReceitasSelecionadas([]);
             setShowBulkActions(false);
             setBulkActionModal(null);
@@ -248,12 +266,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 carregarResumo(false),
                 carregarReceitas(false)
             ]);
-            
-            setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
             console.error('Erro ao marcar receitas como recebidas:', err);
-            setError('Erro ao marcar receitas como recebidas');
-            setTimeout(() => setError(null), 3000);
+            showToast('Erro ao marcar receitas como recebidas', 'error');
         } finally {
             setLoading(false);
         }
@@ -262,35 +277,33 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
     const deletarReceitasSelecionadas = async () => {
         if (receitasSelecionadas.length === 0) return;
         
-        if (!window.confirm(`Tem certeza que deseja deletar ${receitasSelecionadas.length} receita(s)?`)) {
-            return;
-        }
-        
-        try {
-            setLoading(true);
-            await Promise.all(
-                receitasSelecionadas.map(id => 
-                    axios.delete(`/api/financeiro/receitas/${id}`)
-                )
-            );
-            setSuccess(`${receitasSelecionadas.length} receita(s) deletada(s) com sucesso!`);
-            setReceitasSelecionadas([]);
-            setShowBulkActions(false);
-            setBulkActionModal(null);
-            
-            await Promise.all([
-                carregarResumo(false),
-                carregarReceitas(false)
-            ]);
-            
-            setTimeout(() => setSuccess(null), 3000);
-        } catch (err) {
-            console.error('Erro ao deletar receitas:', err);
-            setError('Erro ao deletar receitas');
-            setTimeout(() => setError(null), 3000);
-        } finally {
-            setLoading(false);
-        }
+        setConfirmModal({
+            message: `Tem certeza que deseja deletar ${receitasSelecionadas.length} receita(s)?`,
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    await Promise.all(
+                        receitasSelecionadas.map(id => 
+                            axios.delete(`/api/financeiro/receitas/${id}`)
+                        )
+                    );
+                    showToast(`${receitasSelecionadas.length} receita(s) deletada(s) com sucesso!`, 'success');
+                    setReceitasSelecionadas([]);
+                    setShowBulkActions(false);
+                    setBulkActionModal(null);
+                    
+                    await Promise.all([
+                        carregarResumo(false),
+                        carregarReceitas(false)
+                    ]);
+                } catch (err) {
+                    console.error('Erro ao deletar receitas:', err);
+                    showToast('Erro ao deletar receitas', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     const alterarValorReceitas = async () => {
@@ -298,8 +311,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
         
         const novoValor = parseFloat(novoValorBulk);
         if (isNaN(novoValor) || novoValor <= 0) {
-            setError('Valor inválido');
-            setTimeout(() => setError(null), 3000);
+            showToast('Valor inválido', 'error');
             return;
         }
         
@@ -310,7 +322,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                     axios.put(`/api/financeiro/receitas/${id}`, { valor: novoValor })
                 )
             );
-            setSuccess(`Valor de ${receitasSelecionadas.length} receita(s) alterado(s) para ${formatarMoeda(novoValor)}!`);
+            showToast(`Valor de ${receitasSelecionadas.length} receita(s) alterado(s) para ${formatarMoeda(novoValor)}!`, 'success');
             setReceitasSelecionadas([]);
             setShowBulkActions(false);
             setBulkActionModal(null);
@@ -320,12 +332,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 carregarResumo(false),
                 carregarReceitas(false)
             ]);
-            
-            setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
             console.error('Erro ao alterar valor das receitas:', err);
-            setError('Erro ao alterar valor das receitas');
-            setTimeout(() => setError(null), 3000);
+            showToast('Erro ao alterar valor das receitas', 'error');
         } finally {
             setLoading(false);
         }
@@ -406,8 +415,6 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
-        setSuccess(null);
 
         try {
             setLoading(true);
@@ -455,9 +462,9 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         dataFinalValida,
                         formData: formData
                     });
-                    setError('Para receitas recorrentes, é necessário informar Data Início e Data Final');
-                    setLoading(false);
-                    return;
+                showToast('Para receitas recorrentes, é necessário informar Data Início e Data Final', 'error');
+                setLoading(false);
+                return;
                 }
             }
             
@@ -495,10 +502,10 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 
                 // Se for criação recorrente, usar mensagem do backend
                 if (!editingItem && payload.recorrente && payload.dataInicio && payload.dataFinal && resPagamento.data.total) {
-                    setSuccess(resPagamento.data.message || `${resPagamento.data.total} pagamento(s) recorrente(s) criado(s) com sucesso!`);
+                    showToast(resPagamento.data.message || `${resPagamento.data.total} pagamento(s) recorrente(s) criado(s) com sucesso!`, 'success');
                 } else {
                     const tipoCriado = 'pagamento a receber';
-                    setSuccess(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`);
+                    showToast(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`, 'success');
                 }
             } else {
                 // Criar como receita normal
@@ -533,10 +540,10 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 
                 // Se for criação recorrente, usar mensagem do backend
                 if (!editingItem && payload.recorrente && payload.dataInicio && payload.dataFinal && resReceita.data.total) {
-                    setSuccess(resReceita.data.message || `${resReceita.data.total} receita(s) recorrente(s) criada(s) com sucesso!`);
+                    showToast(resReceita.data.message || `${resReceita.data.total} receita(s) recorrente(s) criada(s) com sucesso!`, 'success');
                 } else {
                     const tipoCriado = formType;
-                    setSuccess(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`);
+                    showToast(editingItem ? `${tipoCriado} atualizado com sucesso!` : `${tipoCriado} criado com sucesso!`, 'success');
                 }
             }
             fecharFormulario();
@@ -553,7 +560,7 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             setLoading(false);
         } catch (err) {
             console.error(`Erro ao ${editingItem ? 'atualizar' : 'criar'} ${formType}:`, err);
-            setError(err.response?.data?.message || `Erro ao ${editingItem ? 'atualizar' : 'criar'} ${formType}`);
+            showToast(err.response?.data?.message || `Erro ao ${editingItem ? 'atualizar' : 'criar'} ${formType}`, 'error');
             setLoading(false);
         }
     };
@@ -563,29 +570,34 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             return;
         }
 
-        try {
-            setLoading(true);
-            const url = tipo === 'pagamento' 
-                ? `/api/financeiro/pagamentos-receber/${id}`
-                : `/api/financeiro/${tipo}s/${id}`;
-            await axios.delete(url);
-            setSuccess(`${tipo} deletado com sucesso!`);
-            
-            // Atualizar tudo em paralelo para garantir que está tudo atualizado
-            // Sempre atualizar o resumo, independente da aba ativa
-            await Promise.all([
-                carregarResumo(false),
-                carregarDespesas(false),
-                carregarReceitas(false),
-                carregarPagamentosReceber(false)
-            ]);
-            
-            setLoading(false);
-        } catch (err) {
-            console.error(`Erro ao deletar ${tipo}:`, err);
-            setError(err.response?.data?.message || `Erro ao deletar ${tipo}`);
-            setLoading(false);
-        }
+        setConfirmModal({
+            message: `Tem certeza que deseja deletar este ${tipo}?`,
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    const url = tipo === 'pagamento' 
+                        ? `/api/financeiro/pagamentos-receber/${id}`
+                        : `/api/financeiro/${tipo}s/${id}`;
+                    await axios.delete(url);
+                    showToast(`${tipo} deletado com sucesso!`, 'success');
+                    
+                    // Atualizar tudo em paralelo para garantir que está tudo atualizado
+                    // Sempre atualizar o resumo, independente da aba ativa
+                    await Promise.all([
+                        carregarResumo(false),
+                        carregarDespesas(false),
+                        carregarReceitas(false),
+                        carregarPagamentosReceber(false)
+                    ]);
+                    
+                    setLoading(false);
+                } catch (err) {
+                    console.error(`Erro ao deletar ${tipo}:`, err);
+                    showToast(err.response?.data?.message || `Erro ao deletar ${tipo}`, 'error');
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     const limparFiltros = () => {
@@ -1095,33 +1107,73 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
 
     return (
         <div>
-            {/* Mensagens de Erro e Sucesso */}
-            {error && (
-                <div style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    background: 'rgba(244, 63, 94, 0.1)',
-                    color: '#f87171',
-                    border: '1px solid rgba(244, 63, 94, 0.2)',
-                    marginBottom: '1rem',
-                    fontSize: '0.9rem'
-                }}>
-                    {error}
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`toast-notification ${toast.type} show`}>
+                    <div className="toast-content">
+                        <span>{toast.message}</span>
+                    </div>
                 </div>
             )}
 
-            {success && (
-                <div style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    color: '#22c55e',
-                    border: '1px solid rgba(34, 197, 94, 0.2)',
-                    marginBottom: '1rem',
-                    fontSize: '0.9rem'
-                }}>
-                    {success}
-                </div>
+            {/* Modal de Confirmação */}
+            {confirmModal && (
+                <>
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            background: 'rgba(0, 0, 0, 0.5)',
+                            zIndex: 10001,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                        onClick={() => setConfirmModal(null)}
+                    >
+                        <div
+                            style={{
+                                background: 'rgba(15, 23, 42, 0.98)',
+                                borderRadius: '16px',
+                                padding: '2rem',
+                                maxWidth: '90%',
+                                width: '400px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 style={{ margin: '0 0 1rem 0', color: '#e2e8f0', fontSize: '1.25rem' }}>
+                                Confirmar ação
+                            </h3>
+                            <p style={{ margin: '0 0 2rem 0', color: 'rgba(226, 232, 240, 0.7)', fontSize: '0.95rem' }}>
+                                {confirmModal.message}
+                            </p>
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                                <button
+                                    className="btn secondary"
+                                    onClick={() => setConfirmModal(null)}
+                                    style={{ padding: '0.75rem 1.5rem' }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    className="btn danger"
+                                    onClick={() => {
+                                        confirmModal.onConfirm();
+                                        setConfirmModal(null);
+                                    }}
+                                    style={{ padding: '0.75rem 1.5rem' }}
+                                >
+                                    Confirmar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* Tabs - Estilo Organizze (apenas se não controlado externamente) */}

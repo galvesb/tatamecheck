@@ -4,6 +4,20 @@ import Map, { Marker, Popup, Source, Layer } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../index.css';
 
+// Função helper para mostrar toast
+const showToast = (message, type = 'success', setToast, toastTimerRef) => {
+    if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+    }
+    
+    setToast({ message, type });
+    
+    toastTimerRef.current = setTimeout(() => {
+        setToast(null);
+        toastTimerRef.current = null;
+    }, 2000);
+};
+
 // Função auxiliar para calcular distância (Haversine)
 const calcularDistancia = (lat1, lon1, lat2, lon2) => {
     const R = 6371000; // Raio da Terra em metros
@@ -57,7 +71,8 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
     const [academiaLocation, setAcademiaLocation] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [toast, setToast] = useState(null);
+    const toastTimerRef = useRef(null);
     const [checkingIn, setCheckingIn] = useState(false);
     const [mapError, setMapError] = useState(false);
     const [mapViewState, setMapViewState] = useState({
@@ -88,12 +103,12 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                         zoom: 16
                     });
                 } else {
-                    setError('Localização da academia não encontrada.');
+                    showToast('Localização da academia não encontrada.', 'error', setToast, toastTimerRef);
                 }
 
                 // Buscar Localização do Usuário
                 if (!navigator.geolocation) {
-                    setError('Geolocalização não suportada neste dispositivo.');
+                    showToast('Geolocalização não suportada neste dispositivo.', 'error', setToast, toastTimerRef);
                 } else {
                     const geoOptions = {
                         enableHighAccuracy: true,
@@ -153,7 +168,7 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                                 latitude: newLocation.lat
                             }));
                             
-                            setError(null);
+                            // Localização obtida com sucesso - não precisa mostrar toast
                         },
                         (err) => {
                             let errorMsg = 'Erro ao obter localização.';
@@ -168,14 +183,14 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                                     errorMsg = 'Tempo esgotado. Verifique se está em área aberta.';
                                     break;
                             }
-                            setError(errorMsg);
+                            showToast(errorMsg, 'error', setToast, toastTimerRef);
                         },
                         geoOptions
                     );
                 }
             } catch (err) {
                 console.error('Erro ao carregar dados:', err);
-                setError(err.response?.data?.message || 'Erro ao carregar dados.');
+                showToast(err.response?.data?.message || 'Erro ao carregar dados.', 'error', setToast, toastTimerRef);
             } finally {
                 setLoading(false);
             }
@@ -191,13 +206,21 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
         };
     }, []);
 
+    // Cleanup do timer do toast ao desmontar
+    useEffect(() => {
+        return () => {
+            if (toastTimerRef.current) {
+                clearTimeout(toastTimerRef.current);
+            }
+        };
+    }, []);
+
     const atualizarLocalizacao = () => {
         if (!navigator.geolocation) {
-            setError('Geolocalização não suportada.');
+            showToast('Geolocalização não suportada.', 'error', setToast, toastTimerRef);
             return;
         }
 
-        setError(null);
         setUserLocation(null);
 
         navigator.geolocation.getCurrentPosition(
@@ -227,7 +250,7 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                         errorMsg = 'Tempo esgotado. Tente novamente.';
                         break;
                 }
-                setError(errorMsg);
+                showToast(errorMsg, 'error', setToast, toastTimerRef);
             },
             {
                 enableHighAccuracy: true,
@@ -254,10 +277,10 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                 // Mas se for outro erro, tentar mesmo assim
                 const errorMessage = err.response?.data?.message || 'Erro ao realizar check-in';
                 if (err.response?.status === 400 && errorMessage.includes('já fez check-in')) {
-                    setError(errorMessage);
+                    showToast(errorMessage, 'error', setToast, toastTimerRef);
                 } else {
                     // Outros erros - tentar mostrar como aviso mas permitir
-                    setError(`Aviso: ${errorMessage}. Verifique com o professor se necessário.`);
+                    showToast(`Aviso: ${errorMessage}. Verifique com o professor se necessário.`, 'error', setToast, toastTimerRef);
                 }
             } finally {
                 setCheckingIn(false);
@@ -272,7 +295,7 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
 
         // Se não temos localização, tentar obter uma última vez
         if (!navigator.geolocation) {
-            setError('Geolocalização não suportada. Tentando check-in mesmo assim...');
+            showToast('Geolocalização não suportada. Tentando check-in mesmo assim...', 'error', setToast, toastTimerRef);
             // Tentar check-in sem coordenadas (o backend validará)
             await realizarCheckIn(null, null);
             return;
@@ -286,7 +309,7 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
             async (err) => {
                 // Mesmo sem localização, tentar fazer check-in
                 // O backend validará se a localização é necessária
-                setError('Não foi possível obter sua localização. Tentando check-in mesmo assim...');
+                showToast('Não foi possível obter sua localização. Tentando check-in mesmo assim...', 'error', setToast, toastTimerRef);
                 await realizarCheckIn(null, null);
             },
             {
@@ -320,7 +343,16 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
     // }
 
     return (
-        <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <>
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`toast-notification ${toast.type} show`} style={{ zIndex: 10001 }}>
+                    <div className="toast-content">
+                        <span>{toast.message}</span>
+                    </div>
+                </div>
+            )}
+            <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0 }}>Check-in</h2>
                 <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
@@ -476,8 +508,6 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
             </div>
 
             <div style={{ padding: '1rem' }}>
-                {error && <div style={{ color: '#f87171', marginBottom: '1rem', padding: '0.5rem', background: 'rgba(248,113,113,0.1)', borderRadius: '4px' }}>{error}</div>}
-                
                 {!userLocation && (
                     <div style={{ 
                         padding: '10px', 
@@ -578,6 +608,7 @@ const CheckInMap = ({ onCheckIn, onClose }) => {
                 )}
             </div>
         </div>
+        </>
     );
 };
 
