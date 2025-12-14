@@ -122,7 +122,7 @@ const Dashboard = () => {
             { id: 'despesas', name: 'Despesas', icon: '💸' },
             { id: 'cadastro', name: 'Novo', icon: '+' },
             { id: 'receitas', name: 'Receitas', icon: '💰' },
-            { id: 'pagamentos', name: 'Mensalidades', icon: '📋' }
+            { id: 'alunos', name: 'Alunos', icon: '👥' }
         ];
     };
 

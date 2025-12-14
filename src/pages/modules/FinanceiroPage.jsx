@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import GerenciarAlunos from '../GerenciarAlunos';
 import '../../index.css';
 
 const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateClick }) => {
@@ -64,8 +65,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             carregarDespesas();
         } else if (activeTab === 'receitas') {
             carregarReceitas();
-        } else if (activeTab === 'pagamentos') {
-            carregarPagamentosReceber();
+        } else if (activeTab === 'alunos') {
+            // Tab de alunos - não precisa carregar dados aqui, o componente GerenciarAlunos faz isso
         } else if (activeTab === 'overview') {
             carregarResumo();
         }
@@ -1192,23 +1193,23 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         Receitas
                     </button>
                     <button
-                        onClick={() => setActiveTab('pagamentos')}
+                        onClick={() => setActiveTab('alunos')}
                         style={{
                             border: 'none',
-                            borderBottom: activeTab === 'pagamentos' ? '3px solid #1cb0f6' : '3px solid transparent',
+                            borderBottom: activeTab === 'alunos' ? '3px solid #1cb0f6' : '3px solid transparent',
                             borderRadius: '0',
                             background: 'transparent',
-                            color: activeTab === 'pagamentos' ? '#1cb0f6' : 'rgba(226, 232, 240, 0.6)',
+                            color: activeTab === 'alunos' ? '#1cb0f6' : 'rgba(226, 232, 240, 0.6)',
                             padding: '0.875rem 1.25rem',
                             cursor: 'pointer',
                             whiteSpace: 'nowrap',
                             flexShrink: 0,
-                            fontWeight: activeTab === 'pagamentos' ? 600 : 400,
+                            fontWeight: activeTab === 'alunos' ? 600 : 400,
                             fontSize: '0.95rem',
                             transition: 'all 0.2s'
                         }}
                     >
-                        A Receber
+                        Alunos
                     </button>
                 </div>
                 </div>
@@ -2351,8 +2352,15 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 </div>
             )}
 
-            {/* Controle de Mensalidades */}
-            {activeTab === 'pagamentos' && (
+            {/* Gerenciar Alunos */}
+            {activeTab === 'alunos' && (
+                <div>
+                    <GerenciarAlunos />
+                </div>
+            )}
+
+            {/* Controle de Mensalidades - REMOVIDO - Substituído por Alunos */}
+            {false && activeTab === 'pagamentos' && (
                 <div>
                     <div className="card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
                         <div style={{ 
