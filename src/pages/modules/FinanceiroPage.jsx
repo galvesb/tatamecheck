@@ -413,6 +413,15 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
             const method = editingItem ? 'put' : 'post';
             const payload = { ...formData };
             
+            // Se estiver editando uma receita, remover campos recorrentes (não devem ser atualizados)
+            if (editingItem && formType === 'receita' && editingItem.tipo !== 'pagamento') {
+                delete payload.recorrente;
+                delete payload.dataInicio;
+                delete payload.dataFinal;
+                delete payload.frequenciaRecorrencia;
+                delete payload.proximaOcorrencia;
+            }
+            
             // Se houver data de recebimento/pagamento, marcar automaticamente como recebido/pago
             if (formType === 'receita' && payload.dataRecebimento) {
                 payload.recebido = true;
@@ -421,32 +430,34 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                 payload.pago = true;
             }
             
-            // Validar campos obrigatórios para recorrentes
-            // Se dataInicio não estiver preenchido explicitamente, usar data ou dataVencimento
-            const dataInicioParaValidacao = payload.dataInicio || payload.data || payload.dataVencimento;
-            const dataInicioValida = dataInicioParaValidacao && 
-                (typeof dataInicioParaValidacao === 'string' ? dataInicioParaValidacao.trim() !== '' : true);
-            const dataFinalValida = payload.dataFinal && 
-                (typeof payload.dataFinal === 'string' ? payload.dataFinal.trim() !== '' : true);
-            
-            // Atualizar payload com dataInicio se não estiver preenchido
-            if (payload.recorrente && !payload.dataInicio && dataInicioParaValidacao) {
-                payload.dataInicio = dataInicioParaValidacao;
-            }
-            
-            if (payload.recorrente && (!dataInicioValida || !dataFinalValida)) {
-                console.log('Erro de validação:', { 
-                    recorrente: payload.recorrente, 
-                    dataInicio: payload.dataInicio, 
-                    dataFinal: payload.dataFinal,
-                    dataInicioParaValidacao,
-                    dataInicioValida,
-                    dataFinalValida,
-                    formData: formData
-                });
-                setError('Para receitas recorrentes, é necessário informar Data Início e Data Final');
-                setLoading(false);
-                return;
+            // Validar campos obrigatórios para recorrentes (apenas ao criar, não ao editar)
+            if (!editingItem) {
+                // Se dataInicio não estiver preenchido explicitamente, usar data ou dataVencimento
+                const dataInicioParaValidacao = payload.dataInicio || payload.data || payload.dataVencimento;
+                const dataInicioValida = dataInicioParaValidacao && 
+                    (typeof dataInicioParaValidacao === 'string' ? dataInicioParaValidacao.trim() !== '' : true);
+                const dataFinalValida = payload.dataFinal && 
+                    (typeof payload.dataFinal === 'string' ? payload.dataFinal.trim() !== '' : true);
+                
+                // Atualizar payload com dataInicio se não estiver preenchido
+                if (payload.recorrente && !payload.dataInicio && dataInicioParaValidacao) {
+                    payload.dataInicio = dataInicioParaValidacao;
+                }
+                
+                if (payload.recorrente && (!dataInicioValida || !dataFinalValida)) {
+                    console.log('Erro de validação:', { 
+                        recorrente: payload.recorrente, 
+                        dataInicio: payload.dataInicio, 
+                        dataFinal: payload.dataFinal,
+                        dataInicioParaValidacao,
+                        dataInicioValida,
+                        dataFinalValida,
+                        formData: formData
+                    });
+                    setError('Para receitas recorrentes, é necessário informar Data Início e Data Final');
+                    setLoading(false);
+                    return;
+                }
             }
             
             // Verificar se está editando um pagamento (tem _id e tipo === 'pagamento')
@@ -944,29 +955,31 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         </>
                     )}
 
-                    {/* Campos comuns para recorrentes */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
-                        <input
-                            type="checkbox"
-                            checked={formData.recorrente || false}
-                            onChange={(e) => {
-                                const isRecorrente = e.target.checked;
-                                // Se marcar como recorrente e dataInicio estiver vazio, preencher com data/dataVencimento
-                                const novoDataInicio = (!formData.dataInicio || formData.dataInicio.trim() === '') && isRecorrente
-                                    ? (formData.data || formData.dataVencimento || new Date().toISOString().split('T')[0])
-                                    : formData.dataInicio;
-                                setFormData({ 
-                                    ...formData, 
-                                    recorrente: isRecorrente,
-                                    dataInicio: novoDataInicio
-                                });
-                            }}
-                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                        />
-                        <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Recorrente</label>
-                    </div>
+                    {/* Campos comuns para recorrentes - apenas ao criar, não ao editar */}
+                    {!editingItem && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px' }}>
+                            <input
+                                type="checkbox"
+                                checked={formData.recorrente || false}
+                                onChange={(e) => {
+                                    const isRecorrente = e.target.checked;
+                                    // Se marcar como recorrente e dataInicio estiver vazio, preencher com data/dataVencimento
+                                    const novoDataInicio = (!formData.dataInicio || formData.dataInicio.trim() === '') && isRecorrente
+                                        ? (formData.data || formData.dataVencimento || new Date().toISOString().split('T')[0])
+                                        : formData.dataInicio;
+                                    setFormData({ 
+                                        ...formData, 
+                                        recorrente: isRecorrente,
+                                        dataInicio: novoDataInicio
+                                    });
+                                }}
+                                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                            />
+                            <label style={{ color: 'rgba(226, 232, 240, 0.9)', cursor: 'pointer', fontSize: '0.95rem' }}>Recorrente</label>
+                        </div>
+                    )}
 
-                    {formData.recorrente && (
+                    {formData.recorrente && !editingItem && (
                         <>
                             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
                                 <div>
