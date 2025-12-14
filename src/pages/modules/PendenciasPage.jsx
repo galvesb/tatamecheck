@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import '../../index.css';
@@ -10,8 +10,31 @@ const PendenciasPage = () => {
     const [activeTab, setActiveTab] = useState('graduacoes'); // 'graduacoes' ou 'presencas'
     const [confirmando, setConfirmando] = useState(null);
     const [observacoes, setObservacoes] = useState({});
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    const [toast, setToast] = useState(null);
+    const toastTimerRef = useRef(null);
+
+    // Função para mostrar toast
+    const showToast = (message, type = 'success') => {
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current);
+        }
+        
+        setToast({ message, type });
+        
+        toastTimerRef.current = setTimeout(() => {
+            setToast(null);
+            toastTimerRef.current = null;
+        }, 2000);
+    };
+
+    // Cleanup do timer ao desmontar
+    useEffect(() => {
+        return () => {
+            if (toastTimerRef.current) {
+                clearTimeout(toastTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (user?.role === 'professor' || user?.role === 'admin') {
@@ -26,7 +49,7 @@ const PendenciasPage = () => {
             setPendencias(res.data);
         } catch (err) {
             console.error('Erro ao carregar pendências:', err);
-            setError('Erro ao carregar pendências');
+            showToast('Erro ao carregar pendências', 'error');
         } finally {
             setLoading(false);
         }
@@ -35,8 +58,6 @@ const PendenciasPage = () => {
     const handleConfirmarGraduacao = async (alunoId, faixa, grau) => {
         try {
             setConfirmando(alunoId);
-            setError('');
-            setSuccess('');
 
             const res = await axios.post(`/api/professor/pendencias/${alunoId}/confirmar-graduacao`, {
                 faixa,
@@ -44,7 +65,7 @@ const PendenciasPage = () => {
                 observacoes: observacoes[alunoId] || ''
             });
 
-            setSuccess(`Graduação confirmada para ${res.data.aluno.faixaAtual} - ${res.data.aluno.grauAtual}º Grau`);
+            showToast(`Graduação confirmada para ${res.data.aluno.faixaAtual} - ${res.data.aluno.grauAtual}º Grau`, 'success');
             setObservacoes(prev => {
                 const newObs = { ...prev };
                 delete newObs[alunoId];
@@ -52,7 +73,7 @@ const PendenciasPage = () => {
             });
             await carregarPendencias();
         } catch (err) {
-            setError(err.response?.data?.message || 'Erro ao confirmar graduação');
+            showToast(err.response?.data?.message || 'Erro ao confirmar graduação', 'error');
         } finally {
             setConfirmando(null);
         }
@@ -60,14 +81,11 @@ const PendenciasPage = () => {
 
     const handleValidarPresenca = async (presencaId) => {
         try {
-            setError('');
-            setSuccess('');
-
             await axios.post(`/api/professor/pendencias/presencas/${presencaId}/validar`);
-            setSuccess('Presença validada com sucesso');
+            showToast('Presença validada com sucesso', 'success');
             await carregarPendencias();
         } catch (err) {
-            setError(err.response?.data?.message || 'Erro ao validar presença');
+            showToast(err.response?.data?.message || 'Erro ao validar presença', 'error');
         }
     };
 
@@ -94,37 +112,20 @@ const PendenciasPage = () => {
 
     return (
         <div>
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`toast-notification ${toast.type} show`}>
+                    <div className="toast-content">
+                        <span>{toast.message}</span>
+                    </div>
+                </div>
+            )}
+
             <div className="card" style={{ marginBottom: '16px' }}>
                 <h2>Pendências</h2>
                 <p style={{ color: 'rgba(226, 232, 240, 0.7)', marginBottom: '1.5rem' }}>
                     Gerencie graduações pendentes e valide presenças dos alunos.
                 </p>
-
-                {error && (
-                    <div style={{
-                        padding: '12px',
-                        borderRadius: '12px',
-                        background: 'rgba(244, 63, 94, 0.15)',
-                        color: '#f87171',
-                        border: '1px solid rgba(244, 63, 94, 0.3)',
-                        marginBottom: '1rem'
-                    }}>
-                        {error}
-                    </div>
-                )}
-
-                {success && (
-                    <div style={{
-                        padding: '12px',
-                        borderRadius: '12px',
-                        background: 'rgba(34, 197, 94, 0.15)',
-                        color: '#22c55e',
-                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                        marginBottom: '1rem'
-                    }}>
-                        {success}
-                    </div>
-                )}
 
                 {/* Tabs */}
                 <div style={{
