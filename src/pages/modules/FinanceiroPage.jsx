@@ -1276,6 +1276,90 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                         </div>
                     ) : resumo ? (
                         <>
+                            {/* Filtros Colapsáveis */}
+                            <div className="card" style={{ marginBottom: '1.5rem' }}>
+                                <button
+                                    onClick={() => setShowFiltros(!showFiltros)}
+                                    style={{ 
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#e2e8f0',
+                                        padding: '0.75rem 0',
+                                        cursor: 'pointer',
+                                        fontSize: '0.95rem',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    <span>🔍 Filtros</span>
+                                    <span style={{ fontSize: '0.75rem' }}>{showFiltros ? '▲' : '▼'}</span>
+                                </button>
+
+                                {showFiltros && (
+                                    <div style={{ 
+                                        paddingTop: '1rem',
+                                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                                        marginTop: '1rem',
+                                        display: 'grid',
+                                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+                                        gap: '1rem'
+                                    }}>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)', fontWeight: 500 }}>
+                                                Data Início
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={filtros.dataInicio}
+                                                onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '0.75rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                    color: '#fff',
+                                                    fontSize: '0.95rem'
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)', fontWeight: 500 }}>
+                                                Data Fim
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={filtros.dataFim}
+                                                onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '0.75rem',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                    color: '#fff',
+                                                    fontSize: '0.95rem'
+                                                }}
+                                            />
+                                        </div>
+                                        {temFiltrosAtivos() && (
+                                            <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
+                                                <button 
+                                                    className="btn secondary" 
+                                                    onClick={limparFiltros} 
+                                                    style={{ width: '100%', padding: '0.75rem' }}
+                                                >
+                                                    Limpar Filtros
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Cards de Resumo - Estilo Organizze */}
                             <div style={{ 
                                 display: 'grid', 
@@ -1386,90 +1470,6 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                         {formatarMoeda(resumo.totalAReceber || (resumo.totalPagamentosPendentes || 0) + (resumo.totalReceitasPendentes || 0))}
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Filtros Colapsáveis */}
-                            <div className="card" style={{ marginBottom: '1.5rem' }}>
-                                <button
-                                    onClick={() => setShowFiltros(!showFiltros)}
-                                    style={{ 
-                                        width: '100%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#e2e8f0',
-                                        padding: '0.75rem 0',
-                                        cursor: 'pointer',
-                                        fontSize: '0.95rem',
-                                        fontWeight: 500
-                                    }}
-                                >
-                                    <span>🔍 Filtros</span>
-                                    <span style={{ fontSize: '0.75rem' }}>{showFiltros ? '▲' : '▼'}</span>
-                                </button>
-
-                                {showFiltros && (
-                                    <div style={{ 
-                                        paddingTop: '1rem',
-                                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                                        marginTop: '1rem',
-                                        display: 'grid',
-                                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-                                        gap: '1rem'
-                                    }}>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)', fontWeight: 500 }}>
-                                                Data Início
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={filtros.dataInicio}
-                                                onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.75rem',
-                                                    borderRadius: '8px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)', fontWeight: 500 }}>
-                                                Data Fim
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={filtros.dataFim}
-                                                onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.75rem',
-                                                    borderRadius: '8px',
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                                    color: '#fff',
-                                                    fontSize: '0.95rem'
-                                                }}
-                                            />
-                                        </div>
-                                        {temFiltrosAtivos() && (
-                                            <div style={{ gridColumn: isMobile ? '1' : '1 / -1' }}>
-                                                <button 
-                                                    className="btn secondary" 
-                                                    onClick={limparFiltros} 
-                                                    style={{ width: '100%', padding: '0.75rem' }}
-                                                >
-                                                    Limpar Filtros
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
                             </div>
                         </>
                     ) : null}
