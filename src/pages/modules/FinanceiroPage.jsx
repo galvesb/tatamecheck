@@ -1277,7 +1277,14 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                     ) : resumo ? (
                         <>
                             {/* Filtros Colapsáveis */}
-                            <div className="card" style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ 
+                                marginBottom: '1.5rem',
+                                padding: '1.75rem',
+                                borderRadius: '16px',
+                                background: 'rgba(15, 23, 42, 0.7)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                            }}>
                                 <button
                                     onClick={() => setShowFiltros(!showFiltros)}
                                     style={{ 
@@ -1288,7 +1295,8 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                         background: 'transparent',
                                         border: 'none',
                                         color: '#e2e8f0',
-                                        padding: '0.75rem 0',
+                                        padding: '0',
+                                        marginBottom: showFiltros ? '1rem' : '0',
                                         cursor: 'pointer',
                                         fontSize: '0.95rem',
                                         fontWeight: 500
@@ -1302,7 +1310,6 @@ const FinanceiroPage = ({ activeTab: externalActiveTab, onTabChange, onCreateCli
                                     <div style={{ 
                                         paddingTop: '1rem',
                                         borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                                        marginTop: '1rem',
                                         display: 'grid',
                                         gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
                                         gap: '1rem'
